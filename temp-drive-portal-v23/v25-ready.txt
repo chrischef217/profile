@@ -1,0 +1,1 @@
+v2.5 compact map ready for isolated PR build.
