@@ -1,4 +1,4 @@
 package com.unityglobal.unity_drive_access;
 
-// Temporary marker removed by ref reset in the next operation.
-final class MainActivitySourceMarker {}
+// This file is restored from the prior validated commit by moving the branch ref.
+final class MainActivityRestoreMarker {}
