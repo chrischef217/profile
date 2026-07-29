@@ -62,17 +62,13 @@ jobs:
           gradle -p temp-drive-portal-v23 :app:assembleRelease --no-daemon --stacktrace
           mkdir -p output/signing-tools
           cp temp-drive-portal-v23/app/build/outputs/apk/release/app-release-unsigned.apk output/UnityGlobal-Drive-Portal-v2.5-unsigned.apk
-
           BUILD_TOOLS_DIR="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           cp "$BUILD_TOOLS_DIR/apksigner" output/signing-tools/
           cp "$BUILD_TOOLS_DIR/zipalign" output/signing-tools/
           cp "$BUILD_TOOLS_DIR/aapt" output/signing-tools/
           cp -R "$BUILD_TOOLS_DIR/lib" output/signing-tools/
-          if [ -d "$BUILD_TOOLS_DIR/lib64" ]; then
-            cp -R "$BUILD_TOOLS_DIR/lib64" output/signing-tools/
-          fi
+          if [ -d "$BUILD_TOOLS_DIR/lib64" ]; then cp -R "$BUILD_TOOLS_DIR/lib64" output/signing-tools/; fi
           chmod +x output/signing-tools/apksigner output/signing-tools/zipalign output/signing-tools/aapt
-
           "$BUILD_TOOLS_DIR/aapt" dump badging output/UnityGlobal-Drive-Portal-v2.5-unsigned.apk > output/unsigned-badging.txt
           grep -q "package: name='com.unityglobal.unity_drive_access' versionCode='6' versionName='1.0.5'" output/unsigned-badging.txt
           unzip -t output/UnityGlobal-Drive-Portal-v2.5-unsigned.apk > /dev/null
