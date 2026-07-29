@@ -50,6 +50,9 @@ jobs:
           cp "$BUILD_TOOLS_DIR/zipalign" output/signing-tools/
           cp "$BUILD_TOOLS_DIR/aapt" output/signing-tools/
           cp -R "$BUILD_TOOLS_DIR/lib" output/signing-tools/
+          if [ -d "$BUILD_TOOLS_DIR/lib64" ]; then
+            cp -R "$BUILD_TOOLS_DIR/lib64" output/signing-tools/
+          fi
           chmod +x output/signing-tools/apksigner output/signing-tools/zipalign output/signing-tools/aapt
 
           "$BUILD_TOOLS_DIR/aapt" dump badging output/UnityGlobal-Drive-Portal-v2.3-unsigned.apk > output/unsigned-badging.txt
