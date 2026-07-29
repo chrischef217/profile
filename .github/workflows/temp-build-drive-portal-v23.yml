@@ -18,16 +18,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
       - name: Restore validated v2.3 source and apply compact map
         run: |
           set -euo pipefail
@@ -38,7 +35,6 @@ jobs:
           python3 temp-drive-portal-v23/patch_visual_tree.py
           sed -i "s/versionCode 4/versionCode 6/" temp-drive-portal-v23/app/build.gradle
           sed -i "s/versionName '1.0.3'/versionName '1.0.5'/" temp-drive-portal-v23/app/build.gradle
-
       - name: Validate compact native map implementation
         run: |
           set -euo pipefail
@@ -55,7 +51,6 @@ jobs:
           grep -q 'versionCode 6' temp-drive-portal-v23/app/build.gradle
           grep -q "versionName '1.0.5'" temp-drive-portal-v23/app/build.gradle
           grep -q 'android.permission.INTERNET' temp-drive-portal-v23/app/src/main/AndroidManifest.xml
-
       - name: Build unsigned release APK
         run: |
           set -euo pipefail
@@ -73,7 +68,6 @@ jobs:
           grep -q "package: name='com.unityglobal.unity_drive_access' versionCode='6' versionName='1.0.5'" output/unsigned-badging.txt
           unzip -t output/UnityGlobal-Drive-Portal-v2.5-unsigned.apk > /dev/null
           sha256sum output/UnityGlobal-Drive-Portal-v2.5-unsigned.apk > output/unsigned.sha256.txt
-
       - uses: actions/upload-artifact@v4
         with:
           name: UnityGlobal-Drive-Portal-v2.5-compact-map-unsigned-and-tools
