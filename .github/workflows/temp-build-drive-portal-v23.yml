@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -26,9 +28,13 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Apply compact map source patch
+      - name: Restore validated v2.3 source and apply compact map
         run: |
           set -euo pipefail
+          BASE_COMMIT=18fbb46ac7f956959ed0375f8b1236bf60bef4c7
+          MAIN=temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
+          git show "$BASE_COMMIT:$MAIN" > "$MAIN"
+          grep -q 'public class MainActivity extends Activity' "$MAIN"
           python3 temp-drive-portal-v23/patch_visual_tree.py
           sed -i "s/versionCode 4/versionCode 6/" temp-drive-portal-v23/app/build.gradle
           sed -i "s/versionName '1.0.3'/versionName '1.0.5'/" temp-drive-portal-v23/app/build.gradle
