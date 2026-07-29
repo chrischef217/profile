@@ -1,4 +1,4 @@
-name: Temporary Build Unity Drive Portal v2.3
+name: Temporary Build Unity Drive Portal v2.4 Visual Tree
 
 on:
   pull_request:
@@ -26,16 +26,24 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Validate local-only map implementation
+      - name: Apply visual tree source patch
         run: |
           set -euo pipefail
-          grep -q '폴더 구조 지도' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
-          grep -q 'startBlink' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
-          grep -q '전체 문서 카테고리' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
-          grep -q '현재 폴더의 하위 폴더' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
+          python3 temp-drive-portal-v23/patch_visual_tree.py
+          sed -i "s/versionCode 4/versionCode 5/" temp-drive-portal-v23/app/build.gradle
+          sed -i "s/versionName '1.0.3'/versionName '1.0.4'/" temp-drive-portal-v23/app/build.gradle
+
+      - name: Validate graphical tree implementation
+        run: |
+          set -euo pipefail
+          grep -q 'VisualFolderTreeView' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
+          grep -q 'UNITY GLOBAL DOCUMENT TREE' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/VisualFolderTreeView.java
+          grep -q 'drawLine' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/VisualFolderTreeView.java
+          grep -q '현재 위치' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/VisualFolderTreeView.java
+          ! grep -q '전체 문서 카테고리' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
           ! grep -q 'folderMap' temp-drive-portal-v23/app/src/main/java/com/unityglobal/unity_drive_access/MainActivity.java
           grep -q "applicationId 'com.unityglobal.unity_drive_access'" temp-drive-portal-v23/app/build.gradle
-          grep -q 'versionCode 4' temp-drive-portal-v23/app/build.gradle
+          grep -q 'versionCode 5' temp-drive-portal-v23/app/build.gradle
           grep -q 'android.permission.INTERNET' temp-drive-portal-v23/app/src/main/AndroidManifest.xml
 
       - name: Build unsigned release APK
@@ -43,7 +51,7 @@ jobs:
           set -euo pipefail
           gradle -p temp-drive-portal-v23 :app:assembleRelease --no-daemon --stacktrace
           mkdir -p output/signing-tools
-          cp temp-drive-portal-v23/app/build/outputs/apk/release/app-release-unsigned.apk output/UnityGlobal-Drive-Portal-v2.3-unsigned.apk
+          cp temp-drive-portal-v23/app/build/outputs/apk/release/app-release-unsigned.apk output/UnityGlobal-Drive-Portal-v2.4-unsigned.apk
 
           BUILD_TOOLS_DIR="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           cp "$BUILD_TOOLS_DIR/apksigner" output/signing-tools/
@@ -55,14 +63,14 @@ jobs:
           fi
           chmod +x output/signing-tools/apksigner output/signing-tools/zipalign output/signing-tools/aapt
 
-          "$BUILD_TOOLS_DIR/aapt" dump badging output/UnityGlobal-Drive-Portal-v2.3-unsigned.apk > output/unsigned-badging.txt
-          grep -q "package: name='com.unityglobal.unity_drive_access' versionCode='4' versionName='1.0.3'" output/unsigned-badging.txt
-          unzip -t output/UnityGlobal-Drive-Portal-v2.3-unsigned.apk > /dev/null
-          sha256sum output/UnityGlobal-Drive-Portal-v2.3-unsigned.apk > output/unsigned.sha256.txt
+          "$BUILD_TOOLS_DIR/aapt" dump badging output/UnityGlobal-Drive-Portal-v2.4-unsigned.apk > output/unsigned-badging.txt
+          grep -q "package: name='com.unityglobal.unity_drive_access' versionCode='5' versionName='1.0.4'" output/unsigned-badging.txt
+          unzip -t output/UnityGlobal-Drive-Portal-v2.4-unsigned.apk > /dev/null
+          sha256sum output/UnityGlobal-Drive-Portal-v2.4-unsigned.apk > output/unsigned.sha256.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: UnityGlobal-Drive-Portal-v2.3-unsigned-and-signing-tools
+          name: UnityGlobal-Drive-Portal-v2.4-visual-tree-unsigned-and-tools
           path: output
           if-no-files-found: error
           retention-days: 7
