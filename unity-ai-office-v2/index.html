@@ -15,13 +15,7 @@
         <div class="brand-copy">
           <h1>UNITY GLOBAL AI OFFICE</h1>
           <div class="runtime-line">
-            <span id="dayCount">DAY —</span>
-            <span class="online-dot"></span>
-            <strong id="onlineText">ONLINE</strong>
-            <span class="separator">|</span>
-            <span id="clockText">--:--</span>
-            <span class="location-icon">☀</span>
-            <span>BANGKOK</span>
+            <span id="dayCount">DAY —</span><span class="online-dot"></span><strong id="onlineText">ONLINE</strong><span class="separator">|</span><span id="clockText">--:--</span><span class="location-icon">☀</span><span>BANGKOK</span>
           </div>
         </div>
       </div>
@@ -29,78 +23,22 @@
         <div class="resource-item" title="오늘 예상 AI 비용"><span class="resource-icon coin">฿</span><strong id="costValue">0</strong></div>
         <div class="resource-item" title="승인 대기"><span class="resource-icon diamond">◇</span><strong id="approvalResource">0</strong></div>
         <div class="resource-item" title="스케줄러 상태"><span class="resource-icon energy">ϟ</span><strong id="energyValue">0/120</strong></div>
-        <button id="languageButton" class="icon-button" type="button" aria-label="언어 전환">KO</button>
-        <button id="refreshButton" class="icon-button" type="button" aria-label="새로고침">↻</button>
+        <button id="languageButton" class="icon-button" type="button" aria-label="언어 전환">KO</button><button id="refreshButton" class="icon-button" type="button" aria-label="새로고침">↻</button>
       </div>
     </header>
     <section class="main-grid">
-      <section class="office-map-panel" aria-label="AI Office map">
-        <img class="office-map-image" src="" alt="Unity Global modern isometric AI office">
-        <div id="departmentLayer" class="department-layer"></div>
-        <div id="officeToast" class="office-toast" hidden></div>
-      </section>
+      <section class="office-map-panel" aria-label="AI Office map"><img class="office-map-image" src="" alt="Unity Global modern isometric AI office"><div id="departmentLayer" class="department-layer"></div><div id="officeToast" class="office-toast" hidden></div></section>
       <aside class="right-rail">
-        <section class="office-status frame-panel-inner">
-          <h2><span aria-hidden="true">▥</span> <span data-i18n="status.title">OFFICE STATUS</span></h2>
-          <dl>
-            <div><dt data-i18n="status.agents">AGENTS</dt><dd id="agentsCount">0</dd></div>
-            <div><dt data-i18n="status.active">ACTIVE</dt><dd id="activeCount" class="value-active">0</dd></div>
-            <div><dt data-i18n="status.queue">QUEUE</dt><dd id="queueCount" class="value-queue">0</dd></div>
-            <div><dt data-i18n="status.approval">APPROVAL</dt><dd id="approvalCount" class="value-approval">0</dd></div>
-          </dl>
-        </section>
-        <section class="work-panel frame-panel-inner">
-          <nav class="work-tabs" aria-label="업무 패널">
-            <button class="work-tab active" data-tab="jobs" data-i18n="tabs.jobs">JOBS</button>
-            <button class="work-tab" data-tab="results" data-i18n="tabs.results">RESULTS</button>
-            <button class="work-tab" data-tab="approval" data-i18n="tabs.approval">APPROVAL</button>
-            <button class="work-tab" data-tab="system" data-i18n="tabs.system">SYSTEM</button>
-          </nav>
-          <div id="tabContent" class="tab-content"></div>
-        </section>
-        <section class="list-panel queue-panel frame-panel-inner">
-          <header><h3 data-i18n="queue.title">QUEUE</h3><strong id="queueTotal">0</strong></header>
-          <div id="queueList" class="compact-list"></div>
-        </section>
-        <section class="list-panel approval-panel frame-panel-inner">
-          <header><h3 data-i18n="approval.title">APPROVAL</h3><strong id="approvalTotal">0</strong></header>
-          <div id="approvalList" class="compact-list"></div>
-        </section>
-        <section class="command-center frame-panel-inner">
-          <h3 data-i18n="command.title">COMMAND CENTER</h3>
-          <form id="commandForm">
-            <input id="commandInput" autocomplete="off" data-i18n-placeholder="command.placeholder" placeholder="지시를 입력하세요...">
-            <button id="executeButton" type="submit"><span data-i18n="command.execute">실행</span><b>▶</b></button>
-          </form>
-          <p id="commandFeedback" aria-live="polite"></p>
-        </section>
+        <section class="office-status frame-panel-inner"><h2><span aria-hidden="true">▥</span> <span data-i18n="status.title">OFFICE STATUS</span></h2><dl><div><dt data-i18n="status.agents">AGENTS</dt><dd id="agentsCount">0</dd></div><div><dt data-i18n="status.active">ACTIVE</dt><dd id="activeCount" class="value-active">0</dd></div><div><dt data-i18n="status.queue">QUEUE</dt><dd id="queueCount" class="value-queue">0</dd></div><div><dt data-i18n="status.approval">APPROVAL</dt><dd id="approvalCount" class="value-approval">0</dd></div></dl></section>
+        <section class="work-panel frame-panel-inner"><nav class="work-tabs" aria-label="업무 패널"><button class="work-tab active" data-tab="jobs" data-i18n="tabs.jobs">JOBS</button><button class="work-tab" data-tab="results" data-i18n="tabs.results">RESULTS</button><button class="work-tab" data-tab="approval" data-i18n="tabs.approval">APPROVAL</button><button class="work-tab" data-tab="system" data-i18n="tabs.system">SYSTEM</button></nav><div id="tabContent" class="tab-content"></div></section>
+        <section class="list-panel queue-panel frame-panel-inner"><header><h3 data-i18n="queue.title">QUEUE</h3><strong id="queueTotal">0</strong></header><div id="queueList" class="compact-list"></div></section>
+        <section class="list-panel approval-panel frame-panel-inner"><header><h3 data-i18n="approval.title">APPROVAL</h3><strong id="approvalTotal">0</strong></header><div id="approvalList" class="compact-list"></div></section>
+        <section class="command-center frame-panel-inner"><h3 data-i18n="command.title">COMMAND CENTER</h3><form id="commandForm"><input id="commandInput" autocomplete="off" data-i18n-placeholder="command.placeholder" placeholder="지시를 입력하세요..."><button id="executeButton" type="submit"><span data-i18n="command.execute">실행</span><b>▶</b></button></form><p id="commandFeedback" aria-live="polite"></p></section>
       </aside>
     </section>
-    <footer class="bottom-bar frame-panel">
-      <nav class="bottom-nav" aria-label="주요 메뉴">
-        <button class="nav-item active" data-view="dashboard"><span>▥</span><b data-i18n="nav.dashboard">DASHBOARD</b></button>
-        <button class="nav-item" data-view="projects"><span>☷</span><b data-i18n="nav.projects">PROJECTS</b></button>
-        <button class="nav-item" data-view="agents"><span>♟</span><b data-i18n="nav.agents">AGENTS</b></button>
-        <button class="nav-item" data-view="analytics"><span>▥</span><b data-i18n="nav.analytics">ANALYTICS</b></button>
-        <button class="nav-item" data-view="knowledge"><span>▤</span><b data-i18n="nav.knowledge">KNOWLEDGE</b></button>
-        <button class="nav-item" data-view="resources"><span>▱</span><b data-i18n="nav.resources">RESOURCES</b></button>
-        <button class="nav-item" data-view="reports"><span>▧</span><b data-i18n="nav.reports">REPORTS</b></button>
-        <button class="nav-item" data-view="settings"><span>⚙</span><b data-i18n="nav.settings">SETTINGS</b></button>
-      </nav>
-      <div class="health-box">
-        <div><span data-i18n="health.title">SYSTEM HEALTH</span><strong id="healthScore">—</strong></div>
-        <div class="health-track"><i id="healthBar"></i></div>
-        <span class="health-shield">◇</span>
-      </div>
-    </footer>
+    <footer class="bottom-bar frame-panel"><nav class="bottom-nav" aria-label="주요 메뉴"><button class="nav-item active" data-view="dashboard"><span>▥</span><b data-i18n="nav.dashboard">DASHBOARD</b></button><button class="nav-item" data-view="projects"><span>☷</span><b data-i18n="nav.projects">PROJECTS</b></button><button class="nav-item" data-view="agents"><span>♟</span><b data-i18n="nav.agents">AGENTS</b></button><button class="nav-item" data-view="analytics"><span>▥</span><b data-i18n="nav.analytics">ANALYTICS</b></button><button class="nav-item" data-view="knowledge"><span>▤</span><b data-i18n="nav.knowledge">KNOWLEDGE</b></button><button class="nav-item" data-view="resources"><span>▱</span><b data-i18n="nav.resources">RESOURCES</b></button><button class="nav-item" data-view="reports"><span>▧</span><b data-i18n="nav.reports">REPORTS</b></button><button class="nav-item" data-view="settings"><span>⚙</span><b data-i18n="nav.settings">SETTINGS</b></button></nav><div class="health-box"><div><span data-i18n="health.title">SYSTEM HEALTH</span><strong id="healthScore">—</strong></div><div class="health-track"><i id="healthBar"></i></div><span class="health-shield">◇</span></div></footer>
   </main>
-  <dialog id="sectionDialog" class="section-dialog">
-    <form method="dialog" class="dialog-card frame-panel">
-      <button class="dialog-close" value="cancel" aria-label="닫기">×</button>
-      <h2 id="dialogTitle"></h2>
-      <div id="dialogContent" class="dialog-content"></div>
-    </form>
-  </dialog>
-  <script src="./image-part-1.js"></script><script src="./image-part-2.js"></script><script src="./image-part-3.js"></script><script src="./image-part-4.js"></script><script src="./image-part-5.js"></script><script src="./app.js"></script>
+  <dialog id="sectionDialog" class="section-dialog"><form method="dialog" class="dialog-card frame-panel"><button class="dialog-close" value="cancel" aria-label="닫기">×</button><h2 id="dialogTitle"></h2><div id="dialogContent" class="dialog-content"></div></form></dialog>
+  <script src="./image-part-1.js"></script><script src="./image-part-2.js"></script><script src="./image-part-3.js"></script><script src="./image-part-4.js"></script><script src="./app-a.js"></script><script src="./app-b.js"></script><script src="./app-c.js"></script>
 </body>
 </html>
