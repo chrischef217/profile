@@ -1,0 +1,1 @@
+v2.6 Google light bilingual motion build ready for isolated CI.
