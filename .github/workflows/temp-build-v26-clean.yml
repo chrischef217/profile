@@ -1,17 +1,34 @@
-name: Temporary Build Unity Drive Portal v2.6 Clean
+name: Temporary Build Unity Drive Portal v2.6 Push
 
 on:
-  pull_request:
+  push:
     branches: [main]
+    paths:
+      - 'v26-main-trigger.txt'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Publish run id
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PAYLOAD="run_id=$GITHUB_RUN_ID\nstatus=started\nsha=$GITHUB_SHA\n"
+          CONTENT="$(printf '%b' "$PAYLOAD" | base64 -w0)"
+          API_PATH="repos/$GITHUB_REPOSITORY/contents/.github/build-results/v26-push-run.txt"
+          SHA="$(gh api "$API_PATH?ref=main" --jq '.sha' 2>/dev/null || true)"
+          if [ -n "$SHA" ]; then
+            gh api --method PUT "$API_PATH" -f message='ci: publish v2.6 push run' -f content="$CONTENT" -f sha="$SHA" -f branch='main'
+          else
+            gh api --method PUT "$API_PATH" -f message='ci: publish v2.6 push run' -f content="$CONTENT" -f branch='main'
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -103,7 +120,7 @@ EOF
 
       - uses: actions/upload-artifact@v4
         with:
-          name: UnityGlobal-Drive-Portal-v2.6-clean-unsigned-and-tools
+          name: UnityGlobal-Drive-Portal-v2.6-push-unsigned-and-tools
           path: output
           if-no-files-found: error
           retention-days: 7
