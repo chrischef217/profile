@@ -1,0 +1,35 @@
+{
+  "build": "UNITY_AI_OFFICE_REFERENCE_V2_20260731",
+  "design_reference": "user-approved modern isometric corporate pixel office",
+  "access_mode": "DEVELOPMENT_OPEN_NO_PASSWORD",
+  "locales": ["ko", "th"],
+  "api": "https://ckzwmimmwdnmpohgvcka.supabase.co/functions/v1/unity-ai-office-dev-open-v2",
+  "office_map": {
+    "format": "webp",
+    "width": 320,
+    "height": 382,
+    "bytes": 9056,
+    "parts": 4,
+    "sha256": "cff3dcc4b1ea1f1c5f6248edb7e2bb730147d163ff12916f60b952f2343a23da"
+  },
+  "verified_features": [
+    "live_state",
+    "command_registration",
+    "task_templates",
+    "jobs_results_approval_system_tabs",
+    "approve_reject_retry",
+    "scheduler_control",
+    "eight_navigation_sections",
+    "capability_context_tool_policy_views",
+    "fifteen_second_refresh"
+  ],
+  "runtime_truth": {
+    "agents": 10,
+    "capabilities": 10,
+    "contexts": 5,
+    "templates": 10,
+    "scheduler": "ACTIVE",
+    "model_execution": "BLOCKED_UNTIL_CREDENTIAL_CONFIGURED",
+    "external_write_execution": "DISABLED"
+  }
+}
