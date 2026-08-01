@@ -2,40 +2,53 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
-  <meta name="robots" content="noindex,nofollow">
-  <title>Unity Global AI Office Game V5</title>
-  <meta name="description" content="Unity Global AI Office NPC operations game">
-  <link rel="stylesheet" href="./styles.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Unity Global AI Office</title>
+  <meta name="description" content="Unity Global AI Office playable operations game">
+  <link rel="stylesheet" href="../unity-ai-office-v2/styles.css">
+  <link rel="stylesheet" href="../unity-ai-office-v4/layout.css">
+  <link rel="stylesheet" href="./game.css">
 </head>
 <body>
-  <div id="app" class="app-shell">
-    <header class="topbar">
-      <div class="brand"><span class="brand-mark">UG</span><div><strong>UNITY GLOBAL AI OFFICE</strong><small>NPC OPERATIONS GAME · V5 PLAYABLE</small></div></div>
-      <div class="top-status"><span class="live"><i></i><b id="connectionLabel">CONNECTING</b></span><span id="bangkokClock">--:--</span><span>BANGKOK</span><button id="zoomOut" type="button" aria-label="Zoom out">−</button><button id="zoomReset" type="button" aria-label="Reset camera">◎</button><button id="zoomIn" type="button" aria-label="Zoom in">＋</button></div>
+  <main id="appShell" class="app-shell" aria-label="Unity Global AI Office">
+    <header class="top-header frame-panel">
+      <div class="brand-block">
+        <div class="brand-emblem" aria-hidden="true"><span>U</span><small>AI</small></div>
+        <div class="brand-copy"><h1>UNITY GLOBAL AI OFFICE</h1><div class="runtime-line"><span id="dayCount">DAY —</span><span class="online-dot"></span><strong id="onlineText">CONNECTING</strong><span class="separator">|</span><span id="clockText">--:--</span><span class="location-icon">☀</span><span>BANGKOK</span></div></div>
+      </div>
+      <div class="resource-bar"><div class="resource-item"><span class="resource-icon coin">฿</span><strong id="costValue">0</strong></div><div class="resource-item"><span class="resource-icon diamond">◇</span><strong id="approvalResource">0</strong></div><div class="resource-item"><span class="resource-icon energy">ϟ</span><strong id="energyValue">120/120</strong></div><button id="languageButton" class="icon-button" type="button">KO</button><button id="refreshButton" class="icon-button" type="button">↻</button></div>
     </header>
-    <main class="workspace">
-      <section class="game-column">
-        <div id="gameMount" class="game-mount" aria-label="AI Office game canvas">
-          <div id="gameLoading" class="game-loading"><div class="loader"></div><strong>AI OFFICE LOADING</strong><span>NPC runtime and office map</span></div>
-          <div id="gameError" class="game-error" hidden><strong>GAME ENGINE LOAD FAILED</strong><span>네트워크를 확인한 뒤 새로고침하십시오.</span></div>
-          <div class="game-hud"><div class="hud-chip"><small>AGENTS</small><b id="agentCount">10</b></div><div class="hud-chip"><small>ACTIVE</small><b id="activeCount">0</b></div><div class="hud-chip"><small>QUEUE</small><b id="queueCount">0</b></div><div class="hud-chip warn"><small>APPROVAL</small><b id="approvalCount">0</b></div></div>
-          <div id="npcSpeech" class="npc-speech" hidden></div>
+
+    <section class="main-grid">
+      <section class="office-map-panel" aria-label="AI Office game map">
+        <div class="map-stage" id="mapStage">
+          <canvas id="officeCanvas" aria-label="Playable AI Office canvas"></canvas>
+          <div class="map-tone"></div>
+          <div class="game-hint">NPC를 클릭하면 현재 업무와 이동 상태를 확인할 수 있습니다.</div>
+          <div id="agentCard" class="agent-card" hidden>
+            <button id="agentCardClose" type="button" aria-label="닫기">×</button>
+            <span id="agentCardStatus">IDLE</span>
+            <strong id="agentCardName">AGENT</strong>
+            <small id="agentCardRole">ROLE</small>
+            <p id="agentCardTask">업무 대기</p>
+          </div>
+          <div id="officeToast" class="office-toast" hidden></div>
         </div>
-        <form id="commandForm" class="command-bar"><div class="command-prefix"><span>›_</span><b>COMMAND</b></div><input id="commandInput" type="text" autocomplete="off" maxlength="1200" placeholder="AI 에이전트에게 실제 업무를 지시하세요..."><button id="commandButton" type="submit"><span>EXECUTE</span><b>▶</b></button></form>
-        <div id="commandFeedback" class="command-feedback">실제 PostgreSQL 작업 큐와 연결됩니다.</div>
       </section>
-      <aside class="control-panel">
-        <section class="panel-section selected-agent"><header><span>SELECTED NPC</span><i id="selectedStatus" class="status-dot"></i></header><div class="agent-profile"><div id="selectedPortrait" class="portrait">AI</div><div><strong id="selectedName">NPC를 선택하십시오</strong><span id="selectedRole">캐릭터를 클릭하면 상태가 표시됩니다.</span></div></div><dl class="agent-stats"><div><dt>STATE</dt><dd id="selectedState">—</dd></div><div><dt>LOCATION</dt><dd id="selectedLocation">—</dd></div><div><dt>ENERGY</dt><dd><span class="energy-track"><i id="selectedEnergy"></i></span><b id="selectedEnergyValue">—</b></dd></div></dl><div class="current-task"><small>CURRENT TASK</small><p id="selectedTask">업무 없음</p></div></section>
-        <nav class="panel-tabs"><button class="active" type="button" data-tab="jobs">JOBS <b id="jobsBadge">0</b></button><button type="button" data-tab="approval">APPROVAL <b id="approvalBadge">0</b></button><button type="button" data-tab="events">EVENTS</button></nav>
-        <section id="jobsPanel" class="tab-panel active"><div id="jobsList" class="scroll-list"></div></section><section id="approvalPanel" class="tab-panel"><div id="approvalList" class="scroll-list"></div></section><section id="eventsPanel" class="tab-panel"><div id="eventsList" class="scroll-list"></div></section>
-        <footer class="system-strip"><div><span>RUNTIME</span><b id="runtimeLabel">INITIALIZING</b></div><div><span>LAST SYNC</span><b id="lastSync">—</b></div></footer>
+
+      <aside class="right-rail">
+        <section class="office-status frame-panel-inner"><h2><span>▥</span> <span>OFFICE STATUS</span></h2><dl><div><dt>AGENTS</dt><dd id="agentsCount">10</dd></div><div><dt>ACTIVE</dt><dd id="activeCount" class="value-active">0</dd></div><div><dt>QUEUE</dt><dd id="queueCount" class="value-queue">0</dd></div><div><dt>APPROVAL</dt><dd id="approvalCount" class="value-approval">0</dd></div></dl></section>
+        <section class="work-panel frame-panel-inner"><nav class="work-tabs"><button class="work-tab active" data-tab="jobs">JOBS</button><button class="work-tab" data-tab="results">RESULTS</button><button class="work-tab" data-tab="approval">APPROVAL</button><button class="work-tab" data-tab="system">SYSTEM</button></nav><div id="tabContent" class="tab-content"></div></section>
+        <section class="list-panel queue-panel frame-panel-inner"><header><h3>QUEUE</h3><strong id="queueTotal">0</strong></header><div id="queueList" class="compact-list"></div></section>
+        <section class="list-panel approval-panel frame-panel-inner"><header><h3>APPROVAL</h3><strong id="approvalTotal">0</strong></header><div id="approvalList" class="compact-list"></div></section>
+        <section class="command-center frame-panel-inner"><h3>COMMAND CENTER</h3><form id="commandForm"><select id="templateSelect" aria-label="Task template"><option value="">직접 지시 / 업무 템플릿 선택</option><option value="태국 시장 경쟁사 조사를 진행하고 핵심 결과를 보고해라">시장 조사</option><option value="현재 프로젝트 상태를 점검하고 위험 요소와 다음 실행안을 보고해라">프로젝트 점검</option><option value="최근 업무 결과를 검증하고 오류가 있으면 수정안을 제시해라">업무 검증</option></select><input id="commandInput" autocomplete="off" placeholder="지시를 입력하세요..."><button id="executeButton" type="submit"><span>실행</span><b>▶</b></button></form><p id="commandFeedback" aria-live="polite"></p></section>
       </aside>
-    </main>
-  </div>
-  <dialog id="jobDialog" class="job-dialog"><form method="dialog" class="dialog-card"><button class="dialog-close" value="cancel" aria-label="Close">×</button><span id="dialogStatus" class="dialog-status">JOB</span><h2 id="dialogTitle">Job</h2><p id="dialogMeta"></p><pre id="dialogBody"></pre><div id="dialogActions" class="dialog-actions"></div></form></dialog>
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    </section>
+
+    <footer class="bottom-bar frame-panel"><nav class="bottom-nav"><button class="nav-item active" data-view="dashboard"><span>▥</span><b>DASHBOARD</b></button><button class="nav-item" data-view="projects"><span>☷</span><b>PROJECTS</b></button><button class="nav-item" data-view="agents"><span>♟</span><b>AGENTS</b></button><button class="nav-item" data-view="analytics"><span>▥</span><b>ANALYTICS</b></button><button class="nav-item" data-view="knowledge"><span>▤</span><b>KNOWLEDGE</b></button><button class="nav-item" data-view="resources"><span>▱</span><b>RESOURCES</b></button><button class="nav-item" data-view="reports"><span>▧</span><b>REPORTS</b></button><button class="nav-item" data-view="settings"><span>⚙</span><b>SETTINGS</b></button></nav><div class="health-box"><div><span>SYSTEM HEALTH</span><strong id="healthScore">—</strong></div><div class="health-track"><i id="healthBar"></i></div><span class="health-shield">◇</span></div></footer>
+  </main>
+
+  <dialog id="sectionDialog" class="section-dialog"><form method="dialog" class="dialog-card frame-panel"><button class="dialog-close" value="cancel">×</button><h2 id="dialogTitle"></h2><div id="dialogContent" class="dialog-content"></div></form></dialog>
   <script src="./game.js"></script>
 </body>
 </html>
