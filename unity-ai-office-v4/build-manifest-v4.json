@@ -5,10 +5,13 @@
   "environment": "office-scene.svg",
   "environment_contains_characters": false,
   "agent_count": 11,
+  "database_agent_count": 10,
+  "system_character_source": "runtime_and_scheduler_state",
+  "pmo_support_source": "audit_agent",
   "agent_rendering": "independent_inline_svg_dom_objects",
   "agent_state_source": "live_api_state",
-  "animations": ["idle","queued","working","running","waiting_approval","blocked","failed","completed"],
-  "active_files": ["index.html","layout.css","agents.css","office-scene.svg","agent-engine.js"],
+  "animations": ["ambient_stroll","idle","queued","working","running","waiting_approval","blocked","failed","completed"],
+  "active_files": ["index.html","layout.css","agents.css","ambient.css","office-scene.svg","agent-engine.js","agent-runtime-map.js"],
   "legacy_operations": ["../unity-ai-office-v2/app-a.js","../unity-ai-office-v2/app-b.js","../unity-ai-office-v2/app-c.js"],
   "prohibited": ["baked_character_background","dot_only_agent_motion","square_canvas"]
 }
