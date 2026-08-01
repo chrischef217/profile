@@ -16,6 +16,7 @@
   const layer = document.getElementById('agentLayer');
   if (!layer) return;
   const nodes = new Map();
+  const runtimeManagedRooms = new Set(['system', 'pmo_support']);
 
   const cssStatus = (status = 'IDLE') => {
     const value = String(status).toLowerCase();
@@ -91,10 +92,12 @@
   function updateAgents() {
     try {
       for (const {button, config} of nodes.values()) {
+        if (runtimeManagedRooms.has(config.room)) continue;
+        const selected = button.classList.contains('is-selected');
         const agent = (state.agents || []).find(item => item.id === config.agentId);
         const job = typeof currentJobFor === 'function' ? currentJobFor(config.agentId) : null;
         const status = cssStatus(job?.status || agent?.status || 'IDLE');
-        button.className = `agent-object ${config.motion} ${status}`;
+        button.className = `agent-object ${config.motion} ${status}${selected ? ' is-selected' : ''}`;
         const title = job?.title || agent?.current_task || 'IDLE';
         button.dataset.label = `${config.room.replace('_',' ').toUpperCase()} · ${status.toUpperCase()}`;
         button.title = `${button.dataset.label} · ${title}`;
