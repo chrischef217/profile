@@ -1,4 +1,11 @@
 (() => {
+  if (!document.querySelector('link[href="./ambient.css"]')) {
+    const ambient = document.createElement('link');
+    ambient.rel = 'stylesheet';
+    ambient.href = './ambient.css';
+    document.head.appendChild(ambient);
+  }
+
   const statusClass = value => {
     const status = String(value || 'IDLE').toLowerCase();
     return ['running','working','approved','queued','waiting_approval','blocked','failed','completed'].includes(status) ? status : 'idle';
@@ -58,5 +65,5 @@
   }, true);
 
   updateSpecialAgents();
-  setInterval(updateSpecialAgents, 760);
+  setInterval(updateSpecialAgents, 120);
 })();
