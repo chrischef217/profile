@@ -2,6 +2,9 @@
   "build": "UNITY_AI_OFFICE_V4_INDEPENDENT_AGENTS",
   "date": "2026-08-01",
   "aspect_ratio": "4:3",
+  "minimum_desktop_canvas": "960x720",
+  "small_viewport_behavior": "horizontal_scroll_preserve_4_3",
+  "qa_viewports": ["1440x900", "1024x768", "390x844"],
   "environment": "office-scene.svg",
   "environment_contains_characters": false,
   "agent_count": 11,
@@ -11,10 +14,12 @@
   "agent_rendering": "independent_inline_svg_dom_objects",
   "agent_state_source": "live_api_state",
   "movement_source": "state_driven_coordinate_routes",
-  "movement_routes": ["department_home","department_roam","pmo_approval","blocked_home"],
+  "movement_routes": ["department_home", "department_roam", "pmo_approval", "blocked_home"],
   "movement_diagnostics": "window.__UG_V4_MOVEMENT.snapshot()",
-  "animations": ["ambient_stroll","coordinate_walk","idle","queued","working","running","waiting_approval","blocked","failed","completed"],
-  "active_files": ["index.html","layout.css","agents.css","ambient.css","movement.css","office-scene.svg","agent-engine.js","agent-runtime-map.js","movement.js"],
-  "legacy_operations": ["../unity-ai-office-v2/app-a.js","../unity-ai-office-v2/app-b.js","../unity-ai-office-v2/app-c.js"],
-  "prohibited": ["baked_character_background","dot_only_agent_motion","square_canvas","state_agnostic_forced_return"]
+  "selection_persistence": true,
+  "runtime_managed_rooms": ["system", "pmo_support"],
+  "animations": ["ambient_stroll", "coordinate_walk", "idle", "queued", "working", "running", "waiting_approval", "blocked", "failed", "completed"],
+  "active_files": ["index.html", "layout.css", "agents.css", "ambient.css", "movement.css", "office-scene.svg", "agent-engine.js", "agent-runtime-map.js", "movement.js"],
+  "legacy_operations": ["../unity-ai-office-v2/app-a.js", "../unity-ai-office-v2/app-b.js", "../unity-ai-office-v2/app-c.js"],
+  "prohibited": ["baked_character_background", "dot_only_agent_motion", "square_canvas", "state_agnostic_forced_return", "mobile_rule_canvas_clipping", "runtime_agent_class_race"]
 }
