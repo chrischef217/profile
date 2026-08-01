@@ -1,0 +1,38 @@
+{
+  "version": "V5_PLAYABLE_BASELINE",
+  "engine": "Phaser 3.90.0",
+  "rendering": "Canvas/WebGL pixel-art game runtime",
+  "source_merge_commit": "c2290f1defec56c7f5ef084b756e74233995cfc3",
+  "public_entry_commit": "19eb62fd1e7a8f9399595677ab61a129bfc91f76",
+  "npc_count": 10,
+  "implemented": [
+    "four-direction procedural sprite animation",
+    "A-star grid pathfinding",
+    "role-based autonomous NPC routines",
+    "workstation, meeting room, coffee bar, lounge, document hub, lobby and server-room destinations",
+    "job-state-driven NPC routing",
+    "NPC selection and camera focus",
+    "live PostgreSQL queue command submission",
+    "approval, rejection and retry actions",
+    "five-second operational API synchronization"
+  ],
+  "operational_status_mapping": {
+    "QUEUED_APPROVED_RUNNING_WORKING": "workstation",
+    "WAITING_APPROVAL": "PMO approval room",
+    "BLOCKED_FAILED": "support/server desk",
+    "COMPLETED": "result lounge"
+  },
+  "deployment_qa": {
+    "page_http": 200,
+    "page_content_type": "text/html",
+    "css_http": 200,
+    "javascript_http": 200,
+    "javascript_syntax": "passed",
+    "phaser_asset_http": 200,
+    "phaser_asset_bytes": 1196122,
+    "api_state_http": 200,
+    "api_agent_count": 10
+  },
+  "art_status": "Unified procedural pixel-art baseline; not final commercial game artwork",
+  "review_policy": "Review only through an actually deployed webpage URL; do not use generated review images"
+}
