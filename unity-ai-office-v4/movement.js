@@ -56,7 +56,7 @@
   const move = (node, x, y, destination = 'roam') => {
     const [currentX, currentY] = currentPosition(node);
     node.dataset.destination = destination;
-    node.style.zIndex = String(12 + Math.round(y));
+    node.style.setProperty('--depth', String(12 + Math.round(y)));
     if (Math.hypot(currentX - x, currentY - y) < 0.35) {
       node.dataset.moving = '0';
       return;
