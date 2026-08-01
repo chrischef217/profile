@@ -1,11 +1,13 @@
-.agent-object{transition:left 2.15s cubic-bezier(.22,.82,.3,1),top 2.15s cubic-bezier(.22,.82,.3,1),filter .25s;z-index:15}
-.agent-object[data-moving="1"]{z-index:28;filter:drop-shadow(0 7px 5px rgba(0,0,0,.65))}
+.agent-object{transition:left 2.15s cubic-bezier(.22,.82,.3,1),top 2.15s cubic-bezier(.22,.82,.3,1),filter .25s;z-index:var(--depth,15)}
+.agent-object[data-moving="1"]{z-index:calc(var(--depth,15) + 30);filter:drop-shadow(0 7px 5px rgba(0,0,0,.65))}
+.agent-object.is-selected{z-index:160}
 .agent-object[data-moving="1"] .agent-body{transform-box:fill-box;transform-origin:center bottom;animation:v4-body-stride .34s steps(2,end) infinite}
 .agent-object[data-moving="1"] .agent-arm.left{animation:v4-arm-left .34s steps(2,end) infinite}
 .agent-object[data-moving="1"] .agent-arm.right{animation:v4-arm-right .34s steps(2,end) infinite}
 .agent-object[data-moving="1"]::after{animation:v4-shadow-step .34s steps(2,end) infinite}
 .agent-object[data-destination="pmo"]::before{opacity:1;color:#82c8e8;border-color:#477f9a}
 .agent-object[data-destination="work"]::before{opacity:1;color:#9bd66d;border-color:#5d873d}
+.agent-object[data-destination="blocked"]::before{opacity:1;color:#f08c82;border-color:#9e453e}
 @keyframes v4-body-stride{0%{transform:translateY(0) rotate(-1deg)}100%{transform:translateY(-3px) rotate(1deg)}}
 @keyframes v4-arm-left{0%{transform:rotate(9deg)}100%{transform:rotate(-8deg)}}
 @keyframes v4-arm-right{0%{transform:rotate(-8deg)}100%{transform:rotate(9deg)}}
