@@ -19,6 +19,6 @@ body{display:grid!important;place-items:center!important;background:radial-gradi
 .work-tabs{height:15%!important}.tab-content{padding:4.5%!important}.list-panel{padding:3.5% 5%!important}.compact-list{margin-top:3%!important;gap:2%!important}
 .command-center{padding:3.5% 5%!important}.command-center form{height:67%!important;grid-template-rows:27% 29% 34%!important;gap:5%!important;margin-top:2.5%!important}.command-center select,.command-center input{border:1px solid #34414c!important;background:#0a1117!important;color:#dfe4e8!important;padding:0 3%!important}.command-center button{border-color:#80602f!important;background:linear-gradient(#7faf37,#4f761e)!important}
 .bottom-bar{grid-template-columns:82% 18%!important;background:linear-gradient(180deg,#101820,#070c11)!important}.nav-item span{font-size:clamp(15px,1.7vw,28px)!important}.nav-item b{font-size:clamp(6px,.62vw,10px)!important}.health-box{padding:5% 7%!important}
-.department-hotspot:after{display:none!important}.department-hotspot{z-index:20!important}
+.department-layer{z-index:5!important;pointer-events:none!important}.department-hotspot:after{display:none!important}.department-hotspot{z-index:5!important;pointer-events:none!important}
 .section-dialog{width:min(70vw,940px)!important}.dialog-card{background:linear-gradient(180deg,#121a22,#080d12)!important}
 @media(max-width:900px){.app-shell{width:100vw!important;height:75vw!important;min-height:560px!important}.brand-copy h1{font-size:18px!important}.right-rail{grid-template-rows:15% 37% 16% 16% 16%!important}}
