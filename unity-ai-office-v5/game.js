@@ -4,117 +4,597 @@
   const API = 'https://ckzwmimmwdnmpohgvcka.supabase.co/functions/v1/unity-ai-office-dev-open-v2';
   const ACTIVE = new Set(['QUEUED', 'APPROVED', 'RUNNING', 'WORKING']);
   const RESULTS = new Set(['COMPLETED', 'BLOCKED', 'FAILED', 'CANCELLED']);
-  const TILE = 48;
-  const COLS = 28;
-  const ROWS = 17;
+  const TILE = 32;
+  const COLS = 35;
+  const ROWS = 22;
   const WORLD_W = COLS * TILE;
   const WORLD_H = ROWS * TILE;
-
   const $ = id => document.getElementById(id);
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const shortTime = value => value ? new Date(value).toLocaleTimeString('ko-KR', {timeZone:'Asia/Bangkok', hour:'2-digit', minute:'2-digit', hour12:false}) : '—';
-
-  const ui = {
-    connection: $('connectionLabel'), live: document.querySelector('.live'), clock: $('bangkokClock'),
-    agents: $('agentCount'), active: $('activeCount'), queue: $('queueCount'), approval: $('approvalCount'),
-    jobsBadge: $('jobsBadge'), approvalBadge: $('approvalBadge'), jobsList: $('jobsList'), approvalList: $('approvalList'), eventsList: $('eventsList'),
-    runtime: $('runtimeLabel'), sync: $('lastSync'), feedback: $('commandFeedback'), command: $('commandInput'), commandButton: $('commandButton'),
-    selectedPortrait: $('selectedPortrait'), selectedName: $('selectedName'), selectedRole: $('selectedRole'), selectedStatus: $('selectedStatus'),
-    selectedState: $('selectedState'), selectedLocation: $('selectedLocation'), selectedEnergy: $('selectedEnergy'), selectedEnergyValue: $('selectedEnergyValue'), selectedTask: $('selectedTask'),
-    dialog: $('jobDialog'), dialogStatus: $('dialogStatus'), dialogTitle: $('dialogTitle'), dialogMeta: $('dialogMeta'), dialogBody: $('dialogBody'), dialogActions: $('dialogActions'),
-    loading: $('gameLoading'), error: $('gameError'), speech: $('npcSpeech')
-  };
 
   const ROLE_CONFIG = {
-    pmo:{name:'PMO',role:'Command & Coordination',shirt:'#d1a65f',hair:'#3a241a',skin:'#e5b58e',desk:[13,7]},
-    design:{name:'DESIGN',role:'UX & System Design',shirt:'#a58ae8',hair:'#332443',skin:'#f0c09a',desk:[18,3]},
-    dev:{name:'DEV',role:'Engineering',shirt:'#4ebbd1',hair:'#18212a',skin:'#d39a73',desk:[21,6]},
-    sales:{name:'SALES',role:'Sales Operations',shirt:'#e17858',hair:'#573021',skin:'#efbd91',desk:[4,3]},
-    product:{name:'PRODUCT',role:'Product & Quality',shirt:'#5da7dc',hair:'#5a3a24',skin:'#e7b589',desk:[9,3]},
-    marketing:{name:'MARKETING',role:'Growth & Content',shirt:'#d65f88',hair:'#2b202a',skin:'#dca37f',desk:[4,8]},
-    finance:{name:'FINANCE',role:'Finance Control',shirt:'#d3ad55',hair:'#2b2420',skin:'#f1c3a0',desk:[4,13]},
-    admin:{name:'ADMIN',role:'Administration',shirt:'#88b85a',hair:'#442e23',skin:'#e4ad83',desk:[10,13]},
-    research:{name:'RESEARCH',role:'Market Intelligence',shirt:'#648ed6',hair:'#1d2b3b',skin:'#dca278',desk:[20,13]},
-    audit:{name:'AUDIT',role:'Verification & Risk',shirt:'#cc6e73',hair:'#382324',skin:'#edb793',desk:[24,13]}
+    pmo:       {name:'GPT PMO',       role:'프로젝트 방향·승인',      color:'#d2a557', desk:[17,10]},
+    design:    {name:'CLAUDE DESIGN', role:'설계·UX 시스템',         color:'#9b7bd9', desk:[24,5]},
+    dev:       {name:'GPT DEV',       role:'개발·배포',               color:'#50a9c4', desk:[28,9]},
+    sales:     {name:'GPT SALES',     role:'영업 운영',               color:'#d67150', desk:[5,5]},
+    product:   {name:'GPT PRODUCT',   role:'제품·품질',               color:'#5797cf', desk:[11,5]},
+    marketing: {name:'GPT MARKETING', role:'마케팅·콘텐츠',           color:'#c95d82', desk:[5,11]},
+    finance:   {name:'GPT FINANCE',   role:'재무 관리',               color:'#c59d45', desk:[5,17]},
+    admin:     {name:'GPT ADMIN',     role:'관리·문서',               color:'#7ba64e', desk:[12,17]},
+    research:  {name:'GPT RESEARCH',  role:'시장·정보 조사',          color:'#5c82c9', desk:[25,17]},
+    audit:     {name:'CLAUDE AUDIT',  role:'감사·검증',               color:'#ba6268', desk:[30,17]}
   };
 
   const STATIONS = {
-    coffee:{tile:[13,14],label:'COFFEE BAR',icon:'☕'},meetingA:{tile:[13,4],label:'STRATEGY ROOM',icon:'◆'},meetingB:{tile:[15,4],label:'STRATEGY ROOM',icon:'◆'},
-    printer:{tile:[15,13],label:'DOCUMENT HUB',icon:'▤'},loungeA:{tile:[24,8],label:'LOUNGE',icon:'…'},loungeB:{tile:[22,8],label:'LOUNGE',icon:'…'},
-    board:{tile:[13,2],label:'PLANNING BOARD',icon:'▥'},server:{tile:[25,4],label:'SERVER ROOM',icon:'⚠'},lobby:{tile:[13,15],label:'LOBBY',icon:'◇'}
+    coffee:   {tile:[17,18], label:'COFFEE BAR'},
+    meeting1: {tile:[16,5],  label:'STRATEGY ROOM'},
+    meeting2: {tile:[19,5],  label:'STRATEGY ROOM'},
+    printer:  {tile:[18,16], label:'DOCUMENT HUB'},
+    lounge1:  {tile:[29,12], label:'LOUNGE'},
+    lounge2:  {tile:[31,12], label:'LOUNGE'},
+    board:    {tile:[17,3],  label:'PLANNING BOARD'},
+    server:   {tile:[31,5],  label:'SERVER ROOM'},
+    lobby:    {tile:[17,20], label:'LOBBY'}
   };
 
-  let appState = {agents:[],jobs:[],events:[],queue:0,approvals:0,settings:{},execution:{}};
-  let gameScene = null;
-  let selectedNpcId = null;
-  let pollTimer = null;
+  const state = {
+    agents: [], jobs: [], events: [], queue: 0, approvals: 0,
+    settings: {}, execution: {}, selectedTab: 'jobs', selectedNpcId: null,
+    online: false, lastSync: null
+  };
 
-  function setConnection(ok,label){ui.connection.textContent=label;ui.live.classList.toggle('online',ok);ui.live.classList.toggle('offline',!ok)}
-  async function api(path,options={}){const headers=new Headers(options.headers||{});if(options.body)headers.set('content-type','application/json');const response=await fetch(API+path,{...options,headers,cache:'no-store'});const data=await response.json().catch(()=>({ok:false,error:`HTTP_${response.status}`}));if(!response.ok||data.ok===false)throw new Error(data.error||`HTTP_${response.status}`);return data}
-  function currentJobFor(agentId){return appState.jobs.find(job=>job.owner_agent_id===agentId&&(ACTIVE.has(job.status)||job.status==='WAITING_APPROVAL'))||null}
-  function jobOutput(job){return job?.result?.output_text||job?.result?.reason||job?.error_message||job?.payload?.description||'아직 처리 결과가 없습니다.'}
-  function jobCard(job){return `<article class="list-card" data-job-id="${escapeHtml(job.id)}"><span class="badge ${escapeHtml(job.status)}">${escapeHtml(job.status)}</span><strong>${escapeHtml(job.title)}</strong><p>${escapeHtml(job.owner_agent_id||'pmo')} · ${escapeHtml(job.capability_key||'pmo_core')}</p><small>${shortTime(job.updated_at||job.created_at)}</small></article>`}
-  function bindCards(root){root.querySelectorAll('[data-job-id]').forEach(card=>card.addEventListener('click',()=>openJob(card.dataset.jobId)))}
-  function renderLists(){const jobs=appState.jobs.filter(job=>ACTIVE.has(job.status)),approvals=appState.jobs.filter(job=>job.status==='WAITING_APPROVAL');ui.jobsList.innerHTML=jobs.map(jobCard).join('')||'<div class="empty-card">진행 중인 업무가 없습니다.</div>';ui.approvalList.innerHTML=approvals.map(jobCard).join('')||'<div class="empty-card">승인 대기 업무가 없습니다.</div>';ui.eventsList.innerHTML=(appState.events||[]).slice(0,35).map(event=>`<article class="list-card"><span class="badge">${escapeHtml(event.event_type||'EVENT')}</span><strong>${escapeHtml(event.message||'System event')}</strong><p>${escapeHtml(event.agent_id||'system')}</p><small>${shortTime(event.created_at)}</small></article>`).join('')||'<div class="empty-card">표시할 이벤트가 없습니다.</div>';bindCards(ui.jobsList);bindCards(ui.approvalList);ui.jobsBadge.textContent=jobs.length;ui.approvalBadge.textContent=approvals.length}
-  function renderHeader(){ui.agents.textContent=appState.agents.length||Object.keys(ROLE_CONFIG).length;ui.active.textContent=appState.agents.filter(agent=>currentJobFor(agent.id)).length;ui.queue.textContent=appState.queue??appState.jobs.filter(job=>ACTIVE.has(job.status)).length;ui.approval.textContent=appState.approvals??appState.jobs.filter(job=>job.status==='WAITING_APPROVAL').length;ui.runtime.textContent=appState.settings?.workday_enabled?'SCHEDULER ACTIVE':'SCHEDULER PAUSED'}
-  function renderSelected(){if(!selectedNpcId||!gameScene?.npcs?.has(selectedNpcId))return;const npc=gameScene.npcs.get(selectedNpcId),sourceAgent=appState.agents.find(agent=>agent.id===selectedNpcId),job=currentJobFor(selectedNpcId),status=job?.status||sourceAgent?.status||npc.mode||'IDLE';ui.selectedPortrait.textContent=selectedNpcId.slice(0,2).toUpperCase();ui.selectedPortrait.style.borderColor=npc.config.shirt;ui.selectedPortrait.style.color=npc.config.shirt;ui.selectedName.textContent=sourceAgent?.name||npc.config.name;ui.selectedRole.textContent=sourceAgent?.role||npc.config.role;ui.selectedState.textContent=status;ui.selectedLocation.textContent=npc.locationLabel||'OFFICE';const energy=Math.round(npc.energy);ui.selectedEnergy.style.width=`${energy}%`;ui.selectedEnergyValue.textContent=`${energy}%`;ui.selectedTask.textContent=job?.title||npc.activityLabel||'자율 업무 대기';ui.selectedStatus.className='status-dot '+(status==='WAITING_APPROVAL'?'waiting':(['BLOCKED','FAILED'].includes(status)?'blocked':(ACTIVE.has(status)?'active':'')))}
-  async function loadState(silent=false){try{const state=await api('/state');appState=state;setConnection(true,'API ONLINE');ui.sync.textContent=new Date().toLocaleTimeString('ko-KR',{timeZone:'Asia/Bangkok',hour12:false});renderHeader();renderLists();gameScene?.applyOperationalState(state);renderSelected()}catch(error){setConnection(false,'API OFFLINE');ui.runtime.textContent=error.message;if(!silent)setFeedback(`연결 실패: ${error.message}`,'err')}}
-  function setFeedback(message,type=''){ui.feedback.className=`command-feedback ${type}`;ui.feedback.textContent=message}
-  async function submitCommand(event){event.preventDefault();const command=ui.command.value.trim();if(!command)return setFeedback('업무 내용을 입력하십시오.','err');ui.commandButton.disabled=true;setFeedback('실제 작업 큐에 등록 중입니다.');try{const data=await api('/command',{method:'POST',body:JSON.stringify({command})});ui.command.value='';setFeedback(`등록 완료 · ${data.job.owner_agent_id} · ${data.job.status}`,'ok');await loadState(true);gameScene?.focusAgent(data.job.owner_agent_id,true)}catch(error){setFeedback(`등록 실패: ${error.message}`,'err')}finally{ui.commandButton.disabled=false}}
-  function openJob(id){const job=appState.jobs.find(item=>item.id===id);if(!job)return;ui.dialogStatus.textContent=job.status;ui.dialogTitle.textContent=job.title;ui.dialogMeta.textContent=`${job.owner_agent_id||'pmo'} · ${job.capability_key||'pmo_core'} · ${job.risk_level||'L1'}`;ui.dialogBody.textContent=jobOutput(job);const buttons=[];if(job.status==='WAITING_APPROVAL')buttons.push(['approve','승인','approve'],['reject','거부','reject']);if(['BLOCKED','FAILED','CANCELLED'].includes(job.status))buttons.push(['retry','재시도','']);ui.dialogActions.innerHTML=buttons.map(([action,label,cls])=>`<button type="button" class="${cls}" data-action="${action}">${label}</button>`).join('');ui.dialogActions.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>actOnJob(button.dataset.action,job.id)));ui.dialog.showModal()}
-  async function actOnJob(action,jobId){try{await api(`/${action}`,{method:'POST',body:JSON.stringify({job_id:jobId})});ui.dialog.close();setFeedback(`업무 상태 변경 완료 · ${action.toUpperCase()}`,'ok');await loadState(true)}catch(error){setFeedback(`상태 변경 실패: ${error.message}`,'err')}}
-  function selectNpc(id,center=false){selectedNpcId=id;gameScene?.setSelected(id);if(center)gameScene?.focusAgent(id,false);renderSelected()}
-  function showSpeech(npc,text,duration=2200){if(!gameScene||!npc||!text)return;const canvasBounds=gameScene.game.canvas.getBoundingClientRect(),screen=gameScene.cameras.main.worldView,zoom=gameScene.cameras.main.zoom;ui.speech.textContent=text;ui.speech.hidden=false;ui.speech.style.left=`${Math.max(8,(npc.sprite.x-screen.x)*zoom*canvasBounds.width/gameScene.scale.width-20)}px`;ui.speech.style.top=`${Math.max(55,(npc.sprite.y-42-screen.y)*zoom*canvasBounds.height/gameScene.scale.height-55)}px`;clearTimeout(showSpeech.timer);showSpeech.timer=setTimeout(()=>{ui.speech.hidden=true},duration)}
-  function setupTabs(){document.querySelectorAll('.panel-tabs button').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.panel-tabs button').forEach(item=>item.classList.toggle('active',item===button));document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('active',panel.id===`${button.dataset.tab}Panel`))}))}
+  const ui = {
+    day: $('dayCount'), onlineText: $('onlineText'), onlineDot: document.querySelector('.online-dot'),
+    clock: $('clockText'), cost: $('costValue'), approvalResource: $('approvalResource'), energy: $('energyValue'),
+    language: $('languageButton'), refresh: $('refreshButton'),
+    agents: $('agentsCount'), active: $('activeCount'), queue: $('queueCount'), approval: $('approvalCount'),
+    queueTotal: $('queueTotal'), approvalTotal: $('approvalTotal'), queueList: $('queueList'), approvalList: $('approvalList'), tabContent: $('tabContent'),
+    form: $('commandForm'), template: $('templateSelect'), input: $('commandInput'), execute: $('executeButton'), feedback: $('commandFeedback'),
+    dialog: $('sectionDialog'), dialogTitle: $('dialogTitle'), dialogContent: $('dialogContent'),
+    card: $('agentCard'), cardClose: $('agentCardClose'), cardStatus: $('agentCardStatus'), cardName: $('agentCardName'), cardRole: $('agentCardRole'), cardTask: $('agentCardTask'),
+    toast: $('officeToast'), healthScore: $('healthScore'), healthBar: $('healthBar')
+  };
 
-  function createAgentSheet(scene,id,config){const frameW=24,frameH=34,frames=4,dirs=4,canvas=document.createElement('canvas');canvas.width=frameW*frames;canvas.height=frameH*dirs;const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;for(let dir=0;dir<dirs;dir++){for(let frame=0;frame<frames;frame++){const ox=frame*frameW,oy=dir*frameH,walk=[0,1,0,-1][frame],arm=[0,-1,0,1][frame];ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(ox+5,oy+30,14,3);ctx.fillStyle='#26313a';if(dir===0||dir===1){ctx.fillRect(ox+7+walk,oy+24,4,7);ctx.fillRect(ox+13-walk,oy+24,4,7)}else{ctx.fillRect(ox+8,oy+24+walk,4,7);ctx.fillRect(ox+13,oy+24-walk,4,7)}ctx.fillStyle=config.shirt;ctx.fillRect(ox+6,oy+13,12,13);ctx.fillStyle='#ffffff18';ctx.fillRect(ox+7,oy+14,10,2);ctx.fillStyle=config.skin;if(dir===2||dir===3){ctx.fillRect(ox+4,oy+15+arm,3,9);ctx.fillRect(ox+17,oy+15-arm,3,9)}else{ctx.fillRect(ox+4+arm,oy+15,3,9);ctx.fillRect(ox+17-arm,oy+15,3,9)}ctx.fillRect(ox+7,oy+4,10,10);ctx.fillStyle=config.hair;ctx.fillRect(ox+7,oy+2,10,5);ctx.fillRect(ox+6,oy+5,3,5);ctx.fillRect(ox+15,oy+5,3,5);if(dir!==3){ctx.fillStyle='#252a2e';if(dir===2){ctx.fillRect(ox+8,oy+8,2,1);ctx.fillRect(ox+14,oy+8,2,1)}else if(dir===0){ctx.fillRect(ox+9,oy+8,2,1);ctx.fillRect(ox+14,oy+8,2,1)}else{ctx.fillRect(ox+8,oy+8,2,1);ctx.fillRect(ox+13,oy+8,2,1)}}ctx.fillStyle='#111920';ctx.fillRect(ox+6,oy+25,12,2);ctx.fillStyle='#d7b96b';ctx.fillRect(ox+10,oy+17,4,2)}}const texture=scene.textures.addCanvas(`agent-${id}`,canvas);for(let dir=0;dir<dirs;dir++)for(let frame=0;frame<frames;frame++)texture.add(dir*4+frame,0,frame*frameW,dir*frameH,frameW,frameH);['down','left','right','up'].forEach((name,dir)=>scene.anims.create({key:`${id}-walk-${name}`,frames:[0,1,2,3].map(i=>({key:`agent-${id}`,frame:dir*4+i})),frameRate:8,repeat:-1}))}
-
-  class AStarGrid{
-    constructor(cols,rows){this.cols=cols;this.rows=rows;this.blocked=new Set()}
-    key(x,y){return`${x},${y}`}
-    block(x,y,w=1,h=1){for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)if(xx>=0&&yy>=0&&xx<this.cols&&yy<this.rows)this.blocked.add(this.key(xx,yy))}
-    isOpen(x,y){return x>=0&&y>=0&&x<this.cols&&y<this.rows&&!this.blocked.has(this.key(x,y))}
-    nearestOpen(x,y){if(this.isOpen(x,y))return[x,y];for(let r=1;r<8;r++)for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++)if(this.isOpen(xx,yy))return[xx,yy];return[1,1]}
-    path(start,end){const[sx,sy]=this.nearestOpen(...start),[ex,ey]=this.nearestOpen(...end),open=[{x:sx,y:sy,g:0,f:0}],came=new Map(),g=new Map([[this.key(sx,sy),0]]),closed=new Set(),h=(x,y)=>Math.abs(ex-x)+Math.abs(ey-y);open[0].f=h(sx,sy);while(open.length){open.sort((a,b)=>a.f-b.f);const cur=open.shift(),ck=this.key(cur.x,cur.y);if(closed.has(ck))continue;if(cur.x===ex&&cur.y===ey){const out=[];let k=ck;while(k){const[x,y]=k.split(',').map(Number);out.unshift([x,y]);k=came.get(k)}return out}closed.add(ck);for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=cur.x+dx,ny=cur.y+dy,nk=this.key(nx,ny);if(!this.isOpen(nx,ny)||closed.has(nk))continue;const ng=cur.g+1;if(ng<(g.get(nk)??Infinity)){g.set(nk,ng);came.set(nk,ck);open.push({x:nx,y:ny,g:ng,f:ng+h(nx,ny)})}}}return[]}
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   }
 
-  class NPC{
-    constructor(scene,id,config){this.scene=scene;this.id=id;this.config=config;this.mode='IDLE';this.energy=84+Math.random()*15;this.activityLabel='자율 업무 대기';this.locationLabel='WORKSTATION';this.path=[];this.pathIndex=0;this.nextDecision=0;this.actionUntil=0;this.operationalJob=null;this.lastStatus='';const[x,y]=scene.tileToWorld(config.desk[0],config.desk[1]);this.sprite=scene.add.sprite(x,y,`agent-${id}`,0).setOrigin(.5,.88).setScale(1.55).setDepth(y+50).setInteractive({useHandCursor:true});this.nameplate=scene.add.container(x,y-45).setDepth(y+100);const bg=scene.add.rectangle(0,0,78,15,0x081017,.88).setStrokeStyle(1,Phaser.Display.Color.HexStringToColor(config.shirt).color,.75),label=scene.add.text(0,0,config.name,{fontFamily:'Arial',fontSize:'8px',fontStyle:'bold',color:'#f3eee3'}).setOrigin(.5);this.nameplate.add([bg,label]);this.icon=scene.add.text(x,y-65,'',{fontFamily:'Arial',fontSize:'14px'}).setOrigin(.5).setDepth(y+120);this.selection=scene.add.ellipse(x,y+2,34,13,0xd8b26a,.15).setStrokeStyle(1,0xd8b26a,.8).setDepth(y-2).setVisible(false);this.sprite.on('pointerdown',()=>selectNpc(id,true));this.sprite.on('pointerover',()=>{scene.input.setDefaultCursor('pointer');this.nameplate.setScale(1.06)});this.sprite.on('pointerout',()=>{scene.input.setDefaultCursor('default');this.nameplate.setScale(1)});this.setMode('IDLE')}
-    setSelected(selected){this.selection.setVisible(selected)}
-    setMode(mode,label){this.mode=mode;if(label)this.activityLabel=label;this.icon.setText(mode==='WORKING'?'⌨':mode==='MEETING'?'◆':mode==='COFFEE'?'☕':mode==='WAITING_APPROVAL'?'!':mode==='BLOCKED'?'⚠':mode==='TALKING'?'…':'')}
-    goTo(tile,label,mode='WALKING'){const current=this.scene.worldToTile(this.sprite.x,this.sprite.y);this.path=this.scene.grid.path(current,tile).slice(1);this.pathIndex=0;this.locationLabel=label;this.setMode(mode,label);if(!this.path.length)this.beginActivity(mode,label)}
-    beginActivity(mode,label){this.setMode(mode,label);const durations={WORKING:6500,MEETING:5000,COFFEE:4200,TALKING:3800,WAITING_APPROVAL:10000,BLOCKED:7000,IDLE:2800};this.actionUntil=this.scene.time.now+(durations[mode]||3200);this.sprite.stop();this.sprite.setFrame(0);if(['WORKING','COFFEE','MEETING'].includes(mode))this.scene.tweens.add({targets:this.sprite,scaleX:1.58,scaleY:1.50,yoyo:true,repeat:2,duration:450})}
-    applyJob(job,status){const changed=status!==this.lastStatus||job?.id!==this.operationalJob?.id;this.operationalJob=job;this.lastStatus=status;if(!changed)return;if(status==='WAITING_APPROVAL'){this.goTo(STATIONS.meetingA.tile,'PMO APPROVAL ROOM','WAITING_APPROVAL');showSpeech(this,'승인 검토를 기다리고 있습니다.')}else if(['BLOCKED','FAILED'].includes(status)){this.goTo(STATIONS.server.tile,'SUPPORT DESK','BLOCKED');showSpeech(this,'문제가 발생했습니다. 지원이 필요합니다.')}else if(ACTIVE.has(status)){this.goTo(this.config.desk,'WORKSTATION','WORKING');showSpeech(this,job?.title?job.title.slice(0,48):'업무를 시작합니다.')}else if(status==='COMPLETED'){this.goTo(STATIONS.loungeA.tile,'RESULT LOUNGE','TALKING');showSpeech(this,'업무 결과를 제출했습니다.')}}
-    autonomousDecision(){if(this.operationalJob&&(ACTIVE.has(this.operationalJob.status)||this.operationalJob.status==='WAITING_APPROVAL'))return;const roleRoutes={pmo:['board','meetingA','coffee'],design:['board','coffee','loungeB'],dev:['server','coffee','printer'],sales:['meetingB','coffee','lobby'],product:['printer','board','coffee'],marketing:['loungeB','coffee','board'],finance:['printer','coffee','meetingB'],admin:['printer','lobby','coffee'],research:['board','loungeA','coffee'],audit:['server','board','coffee']},choices=roleRoutes[this.id]||['coffee','loungeA','printer'],key=Math.random()<.42?'desk':choices[Math.floor(Math.random()*choices.length)];if(key==='desk')this.goTo(this.config.desk,'WORKSTATION','WORKING');else{const station=STATIONS[key],mode=key==='coffee'?'COFFEE':key.startsWith('meeting')||key==='board'?'MEETING':key.startsWith('lounge')?'TALKING':'IDLE';this.goTo(station.tile,station.label,mode)}}
-    update(time,delta){this.energy=Math.max(22,Math.min(100,this.energy+(this.mode==='COFFEE'?.012:this.mode==='WORKING'?-.003:.001)*delta));if(this.pathIndex<this.path.length){const[tx,ty]=this.path[this.pathIndex],[wx,wy]=this.scene.tileToWorld(tx,ty),dx=wx-this.sprite.x,dy=wy-this.sprite.y,dist=Math.hypot(dx,dy),speed=this.mode==='BLOCKED'?72:92;if(dist<3){this.sprite.setPosition(wx,wy);this.pathIndex++;if(this.pathIndex>=this.path.length)this.beginActivity(this.mode==='WALKING'?'IDLE':this.mode,this.activityLabel)}else{const step=Math.min(dist,speed*delta/1000);this.sprite.x+=dx/dist*step;this.sprite.y+=dy/dist*step;const dir=Math.abs(dx)>Math.abs(dy)?(dx<0?'left':'right'):(dy<0?'up':'down'),key=`${this.id}-walk-${dir}`;if(this.sprite.anims.currentAnim?.key!==key)this.sprite.play(key,true)}}else if(time>this.actionUntil&&time>this.nextDecision){this.nextDecision=time+1500+Math.random()*2500;this.autonomousDecision()}this.sprite.setDepth(this.sprite.y+50);this.nameplate.setPosition(this.sprite.x,this.sprite.y-45).setDepth(this.sprite.y+100);this.icon.setPosition(this.sprite.x,this.sprite.y-65).setDepth(this.sprite.y+120);this.selection.setPosition(this.sprite.x,this.sprite.y+2).setDepth(this.sprite.y-2)}
+  function shortTime(value) {
+    if (!value) return '—';
+    try { return new Date(value).toLocaleTimeString('ko-KR', {timeZone:'Asia/Bangkok', hour:'2-digit', minute:'2-digit', hour12:false}); }
+    catch { return '—'; }
   }
 
-  class OfficeScene extends Phaser.Scene{
-    constructor(){super('OfficeScene');this.npcs=new Map();this.selected=null;this.grid=new AStarGrid(COLS,ROWS);this.dragging=false;this.dragOrigin=null}
-    create(){gameScene=this;this.cameras.main.setBackgroundColor('#0a0e12');this.buildGrid();this.drawOffice();Object.entries(ROLE_CONFIG).forEach(([id,config])=>{createAgentSheet(this,id,config);this.npcs.set(id,new NPC(this,id,config))});this.setupCamera();this.setupInput();this.input.mouse?.disableContextMenu();ui.loading.hidden=true;loadState();pollTimer=setInterval(()=>loadState(true),5000);selectNpc('pmo');this.events.once(Phaser.Scenes.Events.SHUTDOWN,()=>clearInterval(pollTimer))}
-    buildGrid(){for(let x=0;x<COLS;x++){this.grid.block(x,0);this.grid.block(x,ROWS-1)}for(let y=0;y<ROWS;y++){this.grid.block(0,y);this.grid.block(COLS-1,y)};[[2,2,5,3],[8,2,4,3],[17,2,5,3],[22,2,4,4],[2,7,5,3],[8,7,5,3],[17,6,6,4],[2,12,5,3],[8,12,5,3],[18,12,4,3],[23,12,3,3]].forEach(r=>this.grid.block(...r));this.grid.block(12,3,4,2);this.grid.block(12,12,4,2)}
-    tileToWorld(x,y){return[x*TILE+TILE/2,y*TILE+TILE/2]}
-    worldToTile(x,y){return[Math.max(0,Math.min(COLS-1,Math.floor(x/TILE))),Math.max(0,Math.min(ROWS-1,Math.floor(y/TILE)))]}
-    drawOffice(){const g=this.add.graphics();g.fillStyle(0x111820,1).fillRect(0,0,WORLD_W,WORLD_H);g.fillStyle(0x26323a,1).fillRect(TILE,TILE,WORLD_W-TILE*2,WORLD_H-TILE*2);for(let y=1;y<ROWS-1;y++)for(let x=1;x<COLS-1;x++){const c=(x+y)%2?0x2d3a42:0x2a363e;g.fillStyle(c,1).fillRect(x*TILE,y*TILE,TILE,TILE);g.lineStyle(1,0xffffff,.025).strokeRect(x*TILE,y*TILE,TILE,TILE)}this.drawCarpet(g,11,1,6,10,0x253746);this.drawCarpet(g,1,11,15,5,0x28323a);this.drawCarpet(g,17,10,10,6,0x252d36);this.drawWalls(g);this.drawWindows(g);this.drawDepartment(g,2,2,5,3,0xb7654b);this.drawDepartment(g,8,2,4,3,0x4e84a8);this.drawDepartment(g,17,2,5,3,0x826cbb);this.drawDepartment(g,22,2,4,4,0x386c7a);this.drawDepartment(g,2,7,5,3,0xb34f73);this.drawDepartment(g,8,7,5,3,0x9c7b42);this.drawDepartment(g,17,6,6,4,0x466f9e);this.drawDepartment(g,2,12,5,3,0xa78a45);this.drawDepartment(g,8,12,5,3,0x678e48);this.drawDepartment(g,18,12,4,3,0x526c9d);this.drawDepartment(g,23,12,3,3,0xa35b61);this.drawMeeting(g,12,3);this.drawCoffee(g,12,12);this.drawLounge(g,22,7);this.drawServer(g,24,3);this.drawPlants(g);this.drawSigns();this.add.rectangle(WORLD_W/2,WORLD_H-18,WORLD_W-100,5,0xd8b26a,.25).setDepth(1)}
-    drawCarpet(g,x,y,w,h,color){g.fillStyle(color,.92).fillRoundedRect(x*TILE,y*TILE,w*TILE,h*TILE,10);g.lineStyle(2,0xcaa760,.12).strokeRoundedRect(x*TILE,y*TILE,w*TILE,h*TILE,10)}
-    drawWalls(g){g.fillStyle(0x0b1015,1);g.fillRect(0,0,WORLD_W,TILE);g.fillRect(0,WORLD_H-TILE,WORLD_W,TILE);g.fillRect(0,0,TILE,WORLD_H);g.fillRect(WORLD_W-TILE,0,TILE,WORLD_H);g.fillStyle(0x52606a,1).fillRect(TILE,TILE-7,WORLD_W-2*TILE,7);g.fillRect(TILE,WORLD_H-TILE,WORLD_W-2*TILE,7)}
-    drawWindows(g){for(let x=2;x<27;x+=3){g.fillStyle(0x8ab4c7,.28).fillRect(x*TILE+4,10,TILE*2-8,26);g.lineStyle(2,0xb9d5df,.18).strokeRect(x*TILE+4,10,TILE*2-8,26);g.lineBetween((x+1)*TILE,10,(x+1)*TILE,36)}}
-    drawDepartment(g,x,y,w,h,color){g.fillStyle(color,.08).fillRoundedRect(x*TILE,y*TILE,w*TILE,h*TILE,8);g.lineStyle(1,color,.35).strokeRoundedRect(x*TILE,y*TILE,w*TILE,h*TILE,8);this.drawDesk(g,x+1,y+1,w-2)}
-    drawDesk(g,x,y,w){const px=x*TILE,py=y*TILE,width=Math.max(TILE*1.4,w*TILE);g.fillStyle(0x5a402b,1).fillRoundedRect(px,py,width,30,4);g.fillStyle(0x97704a,1).fillRect(px+3,py+3,width-6,5);g.fillStyle(0x172029,1).fillRoundedRect(px+12,py-18,34,24,3);g.fillStyle(0x4d7b91,.8).fillRect(px+16,py-14,26,14);g.fillStyle(0x1a2229,1).fillRect(px+24,py+6,10,7);g.fillStyle(0x1b232b,1).fillRoundedRect(px+12,py+35,28,25,5);g.fillStyle(0x45525c,1).fillRect(px+16,py+38,20,6)}
-    drawMeeting(g,x,y){g.fillStyle(0x684c31,1).fillRoundedRect(x*TILE,y*TILE+4,4*TILE,2*TILE-8,30);g.fillStyle(0xaf8757,.55).fillRoundedRect(x*TILE+8,y*TILE+12,4*TILE-16,2*TILE-24,24);for(let i=0;i<4;i++){g.fillStyle(0x1d2730,1).fillRoundedRect((x+i)*TILE+10,y*TILE-12,28,24,5);g.fillRoundedRect((x+i)*TILE+10,(y+2)*TILE-12,28,24,5)}}
-    drawCoffee(g,x,y){g.fillStyle(0x2a1f19,1).fillRoundedRect(x*TILE,y*TILE,4*TILE,2*TILE,8);g.fillStyle(0x806040,1).fillRect(x*TILE+10,y*TILE+10,4*TILE-20,28);g.fillStyle(0x172028,1).fillRoundedRect(x*TILE+22,y*TILE+4,34,28,4);g.fillStyle(0xd7b36a,.65).fillRect(x*TILE+28,y*TILE+11,22,4);for(let i=0;i<3;i++){g.fillStyle(0xf1eadc,.85).fillCircle((x+2+i*.45)*TILE,y*TILE+26,6)}}
-    drawLounge(g,x,y){g.fillStyle(0x1a252d,1).fillRoundedRect(x*TILE,y*TILE,4*TILE,3*TILE,12);g.fillStyle(0x6d4c61,1).fillRoundedRect(x*TILE+12,y*TILE+20,3*TILE+12,45,10);g.fillStyle(0xb07b93,.35).fillRoundedRect(x*TILE+20,y*TILE+26,3*TILE-4,12,4);g.fillStyle(0x6d4b2c,1).fillRoundedRect(x*TILE+50,y*TILE+90,80,30,10)}
-    drawServer(g,x,y){for(let i=0;i<2;i++){g.fillStyle(0x131a20,1).fillRoundedRect((x+i)*TILE+5,y*TILE,38,3*TILE,5);for(let j=0;j<7;j++){g.fillStyle(j%2?0x53bd79:0x4f8cc7,.75).fillCircle((x+i)*TILE+13,y*TILE+14+j*17,2);g.lineStyle(1,0x394650,1).strokeRect((x+i)*TILE+9,y*TILE+8+j*17,28,11)}}}
-    drawPlants(g){[[1.4,5.5],[6.5,5.5],[16.5,5.2],[26.3,7],[16.5,14.5],[1.5,15]].forEach(([x,y])=>{g.fillStyle(0x6d5132,1).fillRect(x*TILE-8,y*TILE+7,16,14);g.fillStyle(0x4c8c5a,1).fillCircle(x*TILE,y*TILE,12);g.fillStyle(0x68a86c,.85).fillCircle(x*TILE-9,y*TILE+2,7);g.fillCircle(x*TILE+9,y*TILE+2,7)})}
-    drawSigns(){const labels=[['SALES',4.5,1.55],['PRODUCT',10,1.55],['DESIGN',19.5,1.55],['ENGINEERING',24,1.55],['MARKETING',4.5,6.55],['PMO',10.5,6.55],['PROJECT LAB',20,5.55],['FINANCE',4.5,11.55],['ADMIN',10.5,11.55],['RESEARCH',20,11.55],['AUDIT',24.5,11.55]];labels.forEach(([text,x,y])=>this.add.text(x*TILE,y*TILE,text,{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#d7c393',stroke:'#10161b',strokeThickness:3}).setOrigin(.5).setDepth(5))}
-    setupCamera(){const cam=this.cameras.main;cam.setBounds(0,0,WORLD_W,WORLD_H);cam.centerOn(WORLD_W/2,WORLD_H/2);cam.setZoom(Math.max(.68,Math.min(1.08,this.scale.height/WORLD_H*.96)));this.scale.on('resize',()=>cam.setZoom(Math.max(.68,Math.min(1.08,this.scale.height/WORLD_H*.96))))}
-    setupInput(){this.input.on('pointerdown',pointer=>{if(pointer.rightButtonDown()||pointer.middleButtonDown()){this.dragging=true;this.dragOrigin={x:pointer.x,y:pointer.y,scrollX:this.cameras.main.scrollX,scrollY:this.cameras.main.scrollY}}});this.input.on('pointermove',pointer=>{if(this.dragging&&pointer.isDown){this.cameras.main.scrollX=this.dragOrigin.scrollX-(pointer.x-this.dragOrigin.x)/this.cameras.main.zoom;this.cameras.main.scrollY=this.dragOrigin.scrollY-(pointer.y-this.dragOrigin.y)/this.cameras.main.zoom}});this.input.on('pointerup',()=>this.dragging=false);this.input.on('wheel',(_p,_o,_dx,dy)=>{this.cameras.main.zoom=Phaser.Math.Clamp(this.cameras.main.zoom-dy*.0005,.58,1.4)})}
-    setSelected(id){this.selected=id;this.npcs.forEach((npc,key)=>npc.setSelected(key===id))}
-    focusAgent(id,pulse=false){const npc=this.npcs.get(id);if(!npc)return;this.cameras.main.pan(npc.sprite.x,npc.sprite.y,550,'Sine.easeInOut');if(pulse)this.tweens.add({targets:npc.selection,alpha:{from:.2,to:.85},scale:{from:.7,to:1.5},yoyo:true,repeat:2,duration:350});selectNpc(id)}
-    applyOperationalState(state){this.npcs.forEach((npc,id)=>{const source=state.agents.find(agent=>agent.id===id),job=state.jobs.find(item=>item.owner_agent_id===id&&(ACTIVE.has(item.status)||item.status==='WAITING_APPROVAL'))||state.jobs.find(item=>item.owner_agent_id===id&&RESULTS.has(item.status)),status=job?.status||source?.status||'IDLE';npc.applyJob(job,status)})}
-    update(time,delta){this.npcs.forEach(npc=>npc.update(time,delta));if(selectedNpcId)renderSelected()}
+  async function api(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (options.body) headers.set('content-type', 'application/json');
+    const response = await fetch(API + path, {...options, headers, cache:'no-store'});
+    const data = await response.json().catch(() => ({ok:false, error:`HTTP_${response.status}`}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP_${response.status}`);
+    return data;
   }
 
-  function startGame(){if(!window.Phaser){ui.loading.hidden=true;ui.error.hidden=false;return}new Phaser.Game({type:Phaser.AUTO,parent:'gameMount',backgroundColor:'#0a0e12',pixelArt:true,antialias:false,roundPixels:true,scale:{mode:Phaser.Scale.RESIZE,width:$('gameMount').clientWidth||960,height:$('gameMount').clientHeight||640},scene:[OfficeScene],render:{pixelArt:true,antialias:false,powerPreference:'high-performance'},fps:{target:60,forceSetTimeOut:false}})}
-  $('commandForm').addEventListener('submit',submitCommand);setupTabs();$('zoomIn').addEventListener('click',()=>{if(gameScene)gameScene.cameras.main.zoom=Phaser.Math.Clamp(gameScene.cameras.main.zoom+.1,.58,1.4)});$('zoomOut').addEventListener('click',()=>{if(gameScene)gameScene.cameras.main.zoom=Phaser.Math.Clamp(gameScene.cameras.main.zoom-.1,.58,1.4)});$('zoomReset').addEventListener('click',()=>{if(gameScene){gameScene.cameras.main.centerOn(WORLD_W/2,WORLD_H/2);gameScene.cameras.main.zoom=Math.max(.68,Math.min(1.08,gameScene.scale.height/WORLD_H*.96))}});setInterval(()=>{ui.clock.textContent=new Date().toLocaleTimeString('ko-KR',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false})},1000);window.addEventListener('error',event=>{if(String(event.message||'').toLowerCase().includes('phaser')){ui.loading.hidden=true;ui.error.hidden=false}});startGame();
+  function currentJob(agentId) {
+    return state.jobs.find(job => job.owner_agent_id === agentId && (ACTIVE.has(job.status) || job.status === 'WAITING_APPROVAL')) || null;
+  }
+
+  function latestJob(agentId) {
+    return state.jobs.find(job => job.owner_agent_id === agentId) || null;
+  }
+
+  function jobText(job) {
+    return job?.result?.output_text || job?.result?.reason || job?.error_message || job?.payload?.description || '처리 내용이 없습니다.';
+  }
+
+  function setOnline(ok) {
+    state.online = ok;
+    ui.onlineText.textContent = ok ? 'ONLINE' : 'OFFLINE';
+    ui.onlineDot.classList.toggle('offline', !ok);
+  }
+
+  function showToast(message, type = '') {
+    ui.toast.hidden = false;
+    ui.toast.textContent = message;
+    ui.toast.className = `office-toast ${type}`;
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => { ui.toast.hidden = true; }, 2600);
+  }
+
+  function setFeedback(message, type = '') {
+    ui.feedback.textContent = message;
+    ui.feedback.className = type;
+  }
+
+  function renderHeader() {
+    const agents = state.agents.length || Object.keys(ROLE_CONFIG).length;
+    const active = state.agents.filter(agent => currentJob(agent.id)).length;
+    const queue = Number.isFinite(state.queue) ? state.queue : state.jobs.filter(job => ACTIVE.has(job.status)).length;
+    const approvals = Number.isFinite(state.approvals) ? state.approvals : state.jobs.filter(job => job.status === 'WAITING_APPROVAL').length;
+    ui.agents.textContent = agents;
+    ui.active.textContent = active;
+    ui.queue.textContent = queue;
+    ui.approval.textContent = approvals;
+    ui.queueTotal.textContent = queue;
+    ui.approvalTotal.textContent = approvals;
+    ui.approvalResource.textContent = approvals;
+    const estimatedCost = Number(state.execution?.cost_total || state.execution?.estimated_cost || 0);
+    ui.cost.textContent = estimatedCost ? estimatedCost.toFixed(2) : '0';
+    const health = state.online ? Math.max(70, 100 - approvals * 4 - state.jobs.filter(job => ['BLOCKED','FAILED'].includes(job.status)).length * 8) : 35;
+    ui.healthScore.textContent = `${health}%`;
+    ui.healthBar.style.width = `${health}%`;
+    ui.energy.textContent = `${Math.max(0, 120 - active * 4)}/120`;
+  }
+
+  function compactJob(job) {
+    return `<article class="compact-entry" data-job-id="${escapeHtml(job.id)}"><strong>${escapeHtml(job.title || '업무')}</strong><small>${escapeHtml(job.owner_agent_id || 'pmo')} · ${shortTime(job.updated_at || job.created_at)}</small><em>${escapeHtml(job.status)}</em></article>`;
+  }
+
+  function bindJobCards(root) {
+    root.querySelectorAll('[data-job-id]').forEach(card => card.addEventListener('click', () => openJob(card.dataset.jobId)));
+  }
+
+  function renderLists() {
+    const queued = state.jobs.filter(job => ACTIVE.has(job.status));
+    const approvals = state.jobs.filter(job => job.status === 'WAITING_APPROVAL');
+    ui.queueList.innerHTML = queued.slice(0, 4).map(compactJob).join('') || '<div class="compact-empty">대기 중인 업무가 없습니다.</div>';
+    ui.approvalList.innerHTML = approvals.slice(0, 4).map(compactJob).join('') || '<div class="compact-empty">승인 대기 업무가 없습니다.</div>';
+    bindJobCards(ui.queueList);
+    bindJobCards(ui.approvalList);
+    renderTab();
+  }
+
+  function tabCard(job) {
+    return `<article class="tab-card" data-job-id="${escapeHtml(job.id)}"><header><strong>${escapeHtml(job.title || '업무')}</strong><b>${escapeHtml(job.status)}</b></header><p>${escapeHtml(job.owner_agent_id || 'pmo')} · ${escapeHtml(job.capability_key || 'pmo_core')} · ${shortTime(job.updated_at || job.created_at)}</p></article>`;
+  }
+
+  function renderTab() {
+    let html = '';
+    if (state.selectedTab === 'jobs') {
+      const jobs = state.jobs.filter(job => ACTIVE.has(job.status));
+      html = jobs.map(tabCard).join('') || '<div class="compact-empty">진행 중인 업무가 없습니다.</div>';
+    } else if (state.selectedTab === 'results') {
+      const jobs = state.jobs.filter(job => RESULTS.has(job.status));
+      html = jobs.map(tabCard).join('') || '<div class="compact-empty">완료 결과가 없습니다.</div>';
+    } else if (state.selectedTab === 'approval') {
+      const jobs = state.jobs.filter(job => job.status === 'WAITING_APPROVAL');
+      html = jobs.map(tabCard).join('') || '<div class="compact-empty">승인 대기 업무가 없습니다.</div>';
+    } else {
+      html = `<div class="system-grid"><div class="system-cell"><small>API</small><strong>${state.online ? 'ONLINE' : 'OFFLINE'}</strong></div><div class="system-cell"><small>SCHEDULER</small><strong>${state.settings?.workday_enabled ? 'ACTIVE' : 'PAUSED'}</strong></div><div class="system-cell"><small>LAST SYNC</small><strong>${state.lastSync ? shortTime(state.lastSync) : '—'}</strong></div><div class="system-cell"><small>RUNTIME</small><strong>CANVAS 2D</strong></div></div>`;
+    }
+    ui.tabContent.innerHTML = html;
+    bindJobCards(ui.tabContent);
+  }
+
+  function openJob(id) {
+    const job = state.jobs.find(item => String(item.id) === String(id));
+    if (!job) return;
+    ui.dialogTitle.textContent = job.title || '업무 상세';
+    const actions = [];
+    if (job.status === 'WAITING_APPROVAL') actions.push(`<button class="approve" data-action="approve">승인</button><button class="reject" data-action="reject">거부</button>`);
+    if (['BLOCKED','FAILED','CANCELLED'].includes(job.status)) actions.push(`<button data-action="retry">재시도</button>`);
+    ui.dialogContent.innerHTML = `<p><strong>${escapeHtml(job.status)}</strong> · ${escapeHtml(job.owner_agent_id || 'pmo')} · ${escapeHtml(job.capability_key || 'pmo_core')}</p><pre>${escapeHtml(jobText(job))}</pre><div class="dialog-actions">${actions.join('')}</div>`;
+    ui.dialogContent.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await api(`/${button.dataset.action}`, {method:'POST', body:JSON.stringify({job_id:job.id})});
+        ui.dialog.close();
+        await loadState(true);
+        showToast(`업무 상태가 ${button.dataset.action.toUpperCase()} 처리되었습니다.`);
+      } catch (error) {
+        button.disabled = false;
+        showToast(`처리 실패: ${error.message}`, 'error');
+      }
+    }));
+    ui.dialog.showModal();
+  }
+
+  async function loadState(silent = false) {
+    try {
+      const data = await api('/state');
+      state.agents = Array.isArray(data.agents) ? data.agents : [];
+      state.jobs = Array.isArray(data.jobs) ? data.jobs : [];
+      state.events = Array.isArray(data.events) ? data.events : [];
+      state.queue = Number(data.queue ?? 0);
+      state.approvals = Number(data.approvals ?? 0);
+      state.settings = data.settings || {};
+      state.execution = data.execution || {};
+      state.lastSync = new Date().toISOString();
+      setOnline(true);
+      renderHeader();
+      renderLists();
+      office.applyOperationalState();
+      renderAgentCard();
+      if (!silent) setFeedback('실제 업무 시스템과 연결되었습니다.', 'ok');
+    } catch (error) {
+      setOnline(false);
+      renderHeader();
+      renderTab();
+      if (!silent) setFeedback(`API 연결 실패: ${error.message}`, 'error');
+    }
+  }
+
+  async function submitCommand(event) {
+    event.preventDefault();
+    const command = ui.input.value.trim() || ui.template.value.trim();
+    if (!command) return setFeedback('지시 내용을 입력하십시오.', 'error');
+    ui.execute.disabled = true;
+    setFeedback('실제 작업 큐에 등록 중입니다.');
+    try {
+      const data = await api('/command', {method:'POST', body:JSON.stringify({command})});
+      ui.input.value = '';
+      ui.template.value = '';
+      setFeedback(`등록 완료 · ${data.job?.owner_agent_id || 'PMO'} · ${data.job?.status || 'QUEUED'}`, 'ok');
+      await loadState(true);
+      if (data.job?.owner_agent_id) office.focusAgent(data.job.owner_agent_id);
+    } catch (error) {
+      setFeedback(`등록 실패: ${error.message}`, 'error');
+    } finally {
+      ui.execute.disabled = false;
+    }
+  }
+
+  class Grid {
+    constructor(cols, rows) { this.cols = cols; this.rows = rows; this.blocked = new Set(); }
+    key(x, y) { return `${x},${y}`; }
+    block(x, y, w = 1, h = 1) {
+      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (xx >= 0 && yy >= 0 && xx < this.cols && yy < this.rows) this.blocked.add(this.key(xx, yy));
+    }
+    open(x, y) { return x >= 0 && y >= 0 && x < this.cols && y < this.rows && !this.blocked.has(this.key(x, y)); }
+    nearest(x, y) {
+      if (this.open(x, y)) return [x, y];
+      for (let r = 1; r < 8; r++) {
+        for (let yy = y - r; yy <= y + r; yy++) for (let xx = x - r; xx <= x + r; xx++) if (this.open(xx, yy)) return [xx, yy];
+      }
+      return [17, 20];
+    }
+    path(start, goal) {
+      start = this.nearest(...start); goal = this.nearest(...goal);
+      const open = [{x:start[0], y:start[1], g:0, f:0, parent:null}];
+      const best = new Map([[this.key(...start), 0]]);
+      const closed = new Set();
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      while (open.length) {
+        open.sort((a,b) => a.f - b.f);
+        const node = open.shift();
+        const key = this.key(node.x, node.y);
+        if (closed.has(key)) continue;
+        if (node.x === goal[0] && node.y === goal[1]) {
+          const result = [];
+          let cursor = node;
+          while (cursor) { result.push([cursor.x, cursor.y]); cursor = cursor.parent; }
+          return result.reverse();
+        }
+        closed.add(key);
+        for (const [dx,dy] of dirs) {
+          const nx = node.x + dx, ny = node.y + dy;
+          if (!this.open(nx, ny)) continue;
+          const g = node.g + 1;
+          const nkey = this.key(nx, ny);
+          if ((best.get(nkey) ?? Infinity) <= g) continue;
+          best.set(nkey, g);
+          open.push({x:nx, y:ny, g, f:g + Math.abs(goal[0]-nx) + Math.abs(goal[1]-ny), parent:node});
+        }
+      }
+      return [start, goal];
+    }
+  }
+
+  class OfficeGame {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.ctx.imageSmoothingEnabled = false;
+      this.grid = new Grid(COLS, ROWS);
+      this.npcs = new Map();
+      this.last = performance.now();
+      this.time = 0;
+      this.scale = 1;
+      this.offsetX = 0;
+      this.offsetY = 0;
+      this.buildCollision();
+      this.createNpcs();
+      this.bind();
+      this.resize();
+      requestAnimationFrame(t => this.loop(t));
+    }
+
+    buildCollision() {
+      this.grid.block(0,0,COLS,1); this.grid.block(0,ROWS-1,COLS,1); this.grid.block(0,0,1,ROWS); this.grid.block(COLS-1,0,1,ROWS);
+      [[3,3,5,4],[9,3,5,4],[22,3,5,4],[27,3,6,4],[3,9,5,5],[26,9,7,5],[3,15,6,5],[10,15,6,5],[22,15,5,5],[28,15,5,5]].forEach(r => this.grid.block(...r));
+      this.grid.block(14,8,7,5);
+    }
+
+    createNpcs() {
+      let index = 0;
+      for (const [id, config] of Object.entries(ROLE_CONFIG)) {
+        const tile = this.grid.nearest(config.desk[0], config.desk[1] + 2);
+        this.npcs.set(id, {
+          id, config, x:(tile[0]+.5)*TILE, y:(tile[1]+.5)*TILE,
+          path:[], pathIndex:0, speed:45 + (index % 3) * 4, direction:'down',
+          mode:'IDLE', activity:'업무 대기', location:'DESK', energy:100,
+          nextDecision: 1.5 + index * .25, bob:Math.random()*Math.PI*2, selected:false
+        });
+        index++;
+      }
+    }
+
+    bind() {
+      window.addEventListener('resize', () => this.resize());
+      this.canvas.addEventListener('click', event => {
+        const rect = this.canvas.getBoundingClientRect();
+        const wx = (event.clientX - rect.left - this.offsetX) / this.scale;
+        const wy = (event.clientY - rect.top - this.offsetY) / this.scale;
+        let picked = null;
+        for (const npc of this.npcs.values()) {
+          if (Math.hypot(wx - npc.x, wy - npc.y) < 22) { picked = npc; break; }
+        }
+        if (picked) {
+          state.selectedNpcId = picked.id;
+          for (const npc of this.npcs.values()) npc.selected = npc.id === picked.id;
+          renderAgentCard();
+          positionAgentCard(picked);
+        }
+      });
+    }
+
+    resize() {
+      const rect = this.canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      this.ctx.setTransform(dpr,0,0,dpr,0,0);
+      this.ctx.imageSmoothingEnabled = false;
+      this.scale = Math.min(rect.width / WORLD_W, rect.height / WORLD_H);
+      this.offsetX = (rect.width - WORLD_W * this.scale) / 2;
+      this.offsetY = (rect.height - WORLD_H * this.scale) / 2;
+    }
+
+    worldToScreen(x, y) { return [this.offsetX + x * this.scale, this.offsetY + y * this.scale]; }
+
+    route(npc, tile, mode, activity, location) {
+      const start = [Math.floor(npc.x / TILE), Math.floor(npc.y / TILE)];
+      const path = this.grid.path(start, tile);
+      npc.path = path.slice(1).map(([x,y]) => [(x+.5)*TILE, (y+.5)*TILE]);
+      npc.pathIndex = 0;
+      npc.mode = mode;
+      npc.activity = activity;
+      npc.location = location;
+    }
+
+    idleRoutine(npc) {
+      const roll = Math.random();
+      if (roll < .52) this.route(npc, [npc.config.desk[0], npc.config.desk[1]+2], 'IDLE', '자율 업무 대기', 'DESK');
+      else if (roll < .68) this.route(npc, STATIONS.coffee.tile, 'BREAK', '커피 브레이크', STATIONS.coffee.label);
+      else if (roll < .80) this.route(npc, STATIONS.printer.tile, 'DOCUMENT', '문서 확인', STATIONS.printer.label);
+      else if (roll < .91) this.route(npc, STATIONS.meeting1.tile, 'MEETING', '팀 협의', STATIONS.meeting1.label);
+      else this.route(npc, STATIONS.lounge1.tile, 'BREAK', '잠시 휴식', STATIONS.lounge1.label);
+      npc.nextDecision = 7 + Math.random() * 8;
+    }
+
+    applyOperationalState() {
+      for (const npc of this.npcs.values()) {
+        const job = currentJob(npc.id);
+        const source = state.agents.find(agent => agent.id === npc.id);
+        const status = job?.status || source?.status || 'IDLE';
+        if (status === 'WAITING_APPROVAL') {
+          this.route(npc, npc.id === 'pmo' ? STATIONS.meeting2.tile : STATIONS.meeting1.tile, status, job?.title || '승인 대기', 'APPROVAL ROOM');
+        } else if (ACTIVE.has(status)) {
+          this.route(npc, [npc.config.desk[0], npc.config.desk[1]+2], status, job?.title || '업무 진행', 'WORKSTATION');
+        } else if (['BLOCKED','FAILED'].includes(status)) {
+          this.route(npc, npc.id === 'dev' ? STATIONS.server.tile : STATIONS.printer.tile, status, job?.title || '문제 해결', npc.id === 'dev' ? STATIONS.server.label : 'SUPPORT DESK');
+        } else if (status === 'COMPLETED') {
+          this.route(npc, STATIONS.lounge2.tile, status, latestJob(npc.id)?.title || '결과 정리', 'RESULT LOUNGE');
+        }
+      }
+    }
+
+    focusAgent(id) {
+      const npc = this.npcs.get(id);
+      if (!npc) return;
+      state.selectedNpcId = id;
+      for (const item of this.npcs.values()) item.selected = item.id === id;
+      renderAgentCard();
+      positionAgentCard(npc);
+    }
+
+    update(dt) {
+      this.time += dt;
+      for (const npc of this.npcs.values()) {
+        npc.bob += dt * 6;
+        npc.nextDecision -= dt;
+        if (!npc.path.length && !currentJob(npc.id) && npc.nextDecision <= 0) this.idleRoutine(npc);
+        const target = npc.path[npc.pathIndex];
+        if (target) {
+          const dx = target[0] - npc.x, dy = target[1] - npc.y;
+          const distance = Math.hypot(dx,dy);
+          if (distance < 2) {
+            npc.x = target[0]; npc.y = target[1]; npc.pathIndex++;
+            if (npc.pathIndex >= npc.path.length) { npc.path = []; npc.pathIndex = 0; }
+          } else {
+            const step = Math.min(distance, npc.speed * dt);
+            npc.x += dx / distance * step;
+            npc.y += dy / distance * step;
+            if (Math.abs(dx) > Math.abs(dy)) npc.direction = dx > 0 ? 'right' : 'left'; else npc.direction = dy > 0 ? 'down' : 'up';
+            npc.energy = Math.max(35, npc.energy - dt * .18);
+          }
+        } else {
+          npc.energy = Math.min(100, npc.energy + dt * .06);
+        }
+      }
+      if (state.selectedNpcId) {
+        const npc = this.npcs.get(state.selectedNpcId);
+        if (npc && !ui.card.hidden) positionAgentCard(npc);
+      }
+    }
+
+    drawRoom(x,y,w,h,label,color='#21303b') {
+      const c = this.ctx;
+      c.fillStyle = '#111a22'; c.fillRect(x*TILE,y*TILE,w*TILE,h*TILE);
+      c.fillStyle = color; c.fillRect((x+.18)*TILE,(y+.18)*TILE,(w-.36)*TILE,(h-.36)*TILE);
+      c.strokeStyle = '#50606b'; c.lineWidth = 2; c.strokeRect((x+.18)*TILE,(y+.18)*TILE,(w-.36)*TILE,(h-.36)*TILE);
+      c.fillStyle = '#d3a85f'; c.font = 'bold 10px monospace'; c.textAlign = 'left'; c.fillText(label, (x+.45)*TILE, (y+.72)*TILE);
+    }
+
+    drawDesk(tile, color) {
+      const c = this.ctx, x = tile[0]*TILE, y = tile[1]*TILE;
+      c.fillStyle='#3b2f25'; c.fillRect(x+3,y+8,TILE*1.55,TILE*.55);
+      c.fillStyle='#6b4f34'; c.fillRect(x+5,y+6,TILE*1.5,7);
+      c.fillStyle='#17242d'; c.fillRect(x+20,y-1,24,16);
+      c.strokeStyle=color; c.strokeRect(x+20,y-1,24,16);
+      c.fillStyle=color; c.fillRect(x+25,y+4,14,3);
+      c.fillStyle='#202a31'; c.fillRect(x+8,y+25,10,10); c.fillRect(x+38,y+25,10,10);
+    }
+
+    drawOffice() {
+      const c = this.ctx;
+      c.fillStyle='#17232b'; c.fillRect(0,0,WORLD_W,WORLD_H);
+      for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) {
+        c.fillStyle = (x+y)%2 ? '#1b2831' : '#1d2b34';
+        c.fillRect(x*TILE,y*TILE,TILE,TILE);
+        c.strokeStyle='rgba(255,255,255,.025)'; c.strokeRect(x*TILE,y*TILE,TILE,TILE);
+      }
+      c.fillStyle='#26343e'; c.fillRect(TILE, TILE, WORLD_W-2*TILE, 2*TILE);
+      c.fillStyle='#0b1116'; c.fillRect(TILE, TILE, WORLD_W-2*TILE, 8);
+      this.drawRoom(2,2,7,6,'SALES','#253543');
+      this.drawRoom(9,2,7,6,'PRODUCT','#263947');
+      this.drawRoom(21,2,6,6,'DESIGN','#302c45');
+      this.drawRoom(27,2,7,6,'DEV / SERVER','#213844');
+      this.drawRoom(2,8,7,7,'MARKETING','#3d2838');
+      this.drawRoom(25,8,9,7,'LOUNGE','#2b3834');
+      this.drawRoom(2,14,8,7,'FINANCE','#3b3424');
+      this.drawRoom(10,14,8,7,'ADMIN','#2b3c28');
+      this.drawRoom(21,14,7,7,'RESEARCH','#28354a');
+      this.drawRoom(28,14,6,7,'AUDIT','#3b282c');
+      this.drawRoom(14,7,7,7,'PMO COMMAND','#3b3122');
+
+      c.fillStyle='#42515b'; c.fillRect(15*TILE,3*TILE,5*TILE,3*TILE);
+      c.fillStyle='#1c252b'; c.fillRect(15.3*TILE,3.3*TILE,4.4*TILE,2.4*TILE);
+      c.strokeStyle='#d3a85f'; c.strokeRect(15.3*TILE,3.3*TILE,4.4*TILE,2.4*TILE);
+      c.fillStyle='#d3a85f'; c.font='bold 10px monospace'; c.textAlign='center'; c.fillText('STRATEGY ROOM',17.5*TILE,4*TILE);
+      c.fillStyle='#5d4933'; c.beginPath(); c.ellipse(17.5*TILE,4.8*TILE,55,18,0,0,Math.PI*2); c.fill();
+
+      for (const [id,cfg] of Object.entries(ROLE_CONFIG)) if (id !== 'pmo') this.drawDesk(cfg.desk,cfg.color);
+      this.drawDesk(ROLE_CONFIG.pmo.desk, ROLE_CONFIG.pmo.color);
+
+      c.fillStyle='#584126'; c.fillRect(15.5*TILE,17.2*TILE,4*TILE,2*TILE);
+      c.fillStyle='#d3a85f'; c.font='bold 9px monospace'; c.fillText('COFFEE BAR',17.5*TILE,17.85*TILE);
+      c.fillStyle='#ece3d0'; c.fillRect(16.2*TILE,18.3*TILE,10,11); c.fillRect(18.2*TILE,18.3*TILE,10,11);
+      c.fillStyle='#33444e'; c.fillRect(16.8*TILE,15.5*TILE,2.2*TILE,1.5*TILE); c.strokeStyle='#d3a85f'; c.strokeRect(16.8*TILE,15.5*TILE,2.2*TILE,1.5*TILE);
+      c.fillStyle='#d3a85f'; c.fillText('DOCUMENT HUB',17.9*TILE,16.35*TILE);
+
+      c.fillStyle='#12191f'; c.fillRect(30*TILE,3*TILE,3*TILE,2.6*TILE); c.strokeStyle='#d65a50'; c.strokeRect(30*TILE,3*TILE,3*TILE,2.6*TILE);
+      c.fillStyle='#d65a50'; c.fillText('SERVER',31.5*TILE,3.7*TILE);
+      for(let i=0;i<4;i++){c.fillStyle=i%2?'#79c65e':'#d3a85f';c.fillRect((30.4+i*.55)*TILE,4.3*TILE,5,5)}
+
+      c.fillStyle='#384752'; c.fillRect(25.8*TILE,10.1*TILE,7.3*TILE,3.7*TILE);
+      c.fillStyle='#657b68'; c.fillRect(26.3*TILE,10.6*TILE,2.4*TILE,1.1*TILE); c.fillRect(30.1*TILE,10.6*TILE,2.4*TILE,1.1*TILE);
+      c.fillStyle='#2a3932'; c.fillRect(27.3*TILE,12.1*TILE,4.2*TILE,.8*TILE);
+      c.fillStyle='#d3a85f'; c.fillText('RESULT LOUNGE',29.5*TILE,13.45*TILE);
+
+      c.fillStyle='#293741'; c.fillRect(14*TILE,19.8*TILE,7*TILE,1.1*TILE); c.strokeStyle='#6a7a84'; c.strokeRect(14*TILE,19.8*TILE,7*TILE,1.1*TILE);
+      c.fillStyle='#d3a85f'; c.fillText('LOBBY',17.5*TILE,20.55*TILE);
+    }
+
+    drawNpc(npc) {
+      const c = this.ctx;
+      const moving = npc.path.length > 0;
+      const phase = moving ? Math.sin(this.time * 10 + npc.bob) : Math.sin(this.time * 2 + npc.bob) * .25;
+      const x = Math.round(npc.x), y = Math.round(npc.y + phase);
+      c.save();
+      c.translate(x,y);
+      c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(0,12,12,5,0,0,Math.PI*2); c.fill();
+      if (npc.selected) { c.strokeStyle='#f0c76e'; c.lineWidth=2; c.beginPath(); c.ellipse(0,10,17,8,0,0,Math.PI*2); c.stroke(); }
+      c.fillStyle='#202a31';
+      if (npc.direction === 'left' || npc.direction === 'right') { c.fillRect(-7,5+phase,5,10); c.fillRect(2,5-phase,5,10); }
+      else { c.fillRect(-8+phase,5,5,10); c.fillRect(3-phase,5,5,10); }
+      c.fillStyle=npc.config.color; c.fillRect(-10,-11,20,18);
+      c.fillStyle='rgba(255,255,255,.2)'; c.fillRect(-8,-9,16,3);
+      c.fillStyle='#e4b38a'; c.fillRect(-7,-22,14,12);
+      c.fillStyle='#30241d'; c.fillRect(-8,-25,16,6); c.fillRect(-8,-21,3,6); c.fillRect(5,-21,3,6);
+      if (npc.direction !== 'up') { c.fillStyle='#25313a'; c.fillRect(-4,-18,2,2); c.fillRect(3,-18,2,2); }
+      c.fillStyle='#e4b38a';
+      if (npc.direction === 'left' || npc.direction === 'right') { c.fillRect(-13,-8+phase,4,12); c.fillRect(9,-8-phase,4,12); }
+      else { c.fillRect(-13+phase,-8,4,12); c.fillRect(9-phase,-8,4,12); }
+      c.fillStyle='#10171c'; c.fillRect(-8,7,16,3);
+      c.restore();
+
+      const job = currentJob(npc.id);
+      const status = job?.status || 'IDLE';
+      c.fillStyle='rgba(5,9,12,.88)'; c.fillRect(x-28,y-42,56,12);
+      c.fillStyle = status === 'WAITING_APPROVAL' ? '#e1a04b' : (ACTIVE.has(status) ? '#7fb342' : (['BLOCKED','FAILED'].includes(status) ? '#d65a50' : '#a8b2b8'));
+      c.font='bold 7px monospace'; c.textAlign='center'; c.fillText(npc.config.name.replace('GPT ','').replace('CLAUDE ',''),x,y-34);
+    }
+
+    draw() {
+      const rect = this.canvas.getBoundingClientRect();
+      const c = this.ctx;
+      c.clearRect(0,0,rect.width,rect.height);
+      c.save();
+      c.translate(this.offsetX,this.offsetY);
+      c.scale(this.scale,this.scale);
+      this.drawOffice();
+      [...this.npcs.values()].sort((a,b)=>a.y-b.y).forEach(npc=>this.drawNpc(npc));
+      c.restore();
+    }
+
+    loop(now) {
+      const dt = Math.min(.05, (now - this.last) / 1000);
+      this.last = now;
+      this.update(dt);
+      this.draw();
+      requestAnimationFrame(t => this.loop(t));
+    }
+  }
+
+  function positionAgentCard(npc) {
+    const [sx,sy] = office.worldToScreen(npc.x,npc.y);
+    const stage = $('mapStage').getBoundingClientRect();
+    const cardWidth = ui.card.offsetWidth || 190;
+    const cardHeight = ui.card.offsetHeight || 110;
+    ui.card.style.left = `${Math.min(stage.width-cardWidth-8, Math.max(8,sx+18))}px`;
+    ui.card.style.top = `${Math.min(stage.height-cardHeight-8, Math.max(8,sy-95))}px`;
+  }
+
+  function renderAgentCard() {
+    const id = state.selectedNpcId;
+    if (!id || !office?.npcs?.has(id)) { ui.card.hidden = true; return; }
+    const npc = office.npcs.get(id);
+    const agent = state.agents.find(item => item.id === id);
+    const job = currentJob(id);
+    const status = job?.status || agent?.status || npc.mode || 'IDLE';
+    ui.cardStatus.textContent = status;
+    ui.cardStatus.className = status === 'WAITING_APPROVAL' ? 'waiting' : (ACTIVE.has(status) ? 'active' : (['BLOCKED','FAILED'].includes(status) ? 'blocked' : ''));
+    ui.cardName.textContent = agent?.name || npc.config.name;
+    ui.cardRole.textContent = agent?.role || npc.config.role;
+    ui.cardTask.textContent = job?.title || npc.activity || '자율 업무 대기';
+    ui.card.hidden = false;
+  }
+
+  function setupUi() {
+    document.querySelectorAll('.work-tab').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('.work-tab').forEach(item => item.classList.toggle('active', item === button));
+      state.selectedTab = button.dataset.tab;
+      renderTab();
+    }));
+    ui.form.addEventListener('submit', submitCommand);
+    ui.template.addEventListener('change', () => { if (ui.template.value) ui.input.value = ui.template.value; });
+    ui.refresh.addEventListener('click', () => loadState(false));
+    ui.language.addEventListener('click', () => showToast('현재 개발 기준 언어는 한국어입니다.'));
+    ui.cardClose.addEventListener('click', () => { ui.card.hidden = true; state.selectedNpcId = null; for (const npc of office.npcs.values()) npc.selected = false; });
+    document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item === button));
+      if (button.dataset.view === 'dashboard') return;
+      showToast(`${button.querySelector('b')?.textContent || '기능'} 화면은 운영 기능 확장 단계에서 연결됩니다.`);
+    }));
+    setInterval(() => {
+      const now = new Date();
+      ui.clock.textContent = now.toLocaleTimeString('ko-KR',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false});
+      const start = new Date('2026-07-01T00:00:00+07:00');
+      ui.day.textContent = `DAY ${Math.max(1, Math.floor((now-start)/86400000)+1)}`;
+    }, 1000);
+  }
+
+  const office = new OfficeGame($('officeCanvas'));
+  setupUi();
+  loadState(false);
+  setInterval(() => loadState(true), 5000);
 })();
