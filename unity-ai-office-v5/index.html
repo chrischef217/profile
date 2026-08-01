@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Unity Global AI Office Game V5</title>
+  <meta name="description" content="Unity Global AI Office NPC operations game">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">UG</span><div><strong>UNITY GLOBAL AI OFFICE</strong><small>NPC OPERATIONS GAME · V5 PLAYABLE</small></div></div>
+      <div class="top-status"><span class="live"><i></i><b id="connectionLabel">CONNECTING</b></span><span id="bangkokClock">--:--</span><span>BANGKOK</span><button id="zoomOut" type="button" aria-label="Zoom out">−</button><button id="zoomReset" type="button" aria-label="Reset camera">◎</button><button id="zoomIn" type="button" aria-label="Zoom in">＋</button></div>
+    </header>
+    <main class="workspace">
+      <section class="game-column">
+        <div id="gameMount" class="game-mount" aria-label="AI Office game canvas">
+          <div id="gameLoading" class="game-loading"><div class="loader"></div><strong>AI OFFICE LOADING</strong><span>NPC runtime and office map</span></div>
+          <div id="gameError" class="game-error" hidden><strong>GAME ENGINE LOAD FAILED</strong><span>네트워크를 확인한 뒤 새로고침하십시오.</span></div>
+          <div class="game-hud"><div class="hud-chip"><small>AGENTS</small><b id="agentCount">10</b></div><div class="hud-chip"><small>ACTIVE</small><b id="activeCount">0</b></div><div class="hud-chip"><small>QUEUE</small><b id="queueCount">0</b></div><div class="hud-chip warn"><small>APPROVAL</small><b id="approvalCount">0</b></div></div>
+          <div id="npcSpeech" class="npc-speech" hidden></div>
+        </div>
+        <form id="commandForm" class="command-bar"><div class="command-prefix"><span>›_</span><b>COMMAND</b></div><input id="commandInput" type="text" autocomplete="off" maxlength="1200" placeholder="AI 에이전트에게 실제 업무를 지시하세요..."><button id="commandButton" type="submit"><span>EXECUTE</span><b>▶</b></button></form>
+        <div id="commandFeedback" class="command-feedback">실제 PostgreSQL 작업 큐와 연결됩니다.</div>
+      </section>
+      <aside class="control-panel">
+        <section class="panel-section selected-agent"><header><span>SELECTED NPC</span><i id="selectedStatus" class="status-dot"></i></header><div class="agent-profile"><div id="selectedPortrait" class="portrait">AI</div><div><strong id="selectedName">NPC를 선택하십시오</strong><span id="selectedRole">캐릭터를 클릭하면 상태가 표시됩니다.</span></div></div><dl class="agent-stats"><div><dt>STATE</dt><dd id="selectedState">—</dd></div><div><dt>LOCATION</dt><dd id="selectedLocation">—</dd></div><div><dt>ENERGY</dt><dd><span class="energy-track"><i id="selectedEnergy"></i></span><b id="selectedEnergyValue">—</b></dd></div></dl><div class="current-task"><small>CURRENT TASK</small><p id="selectedTask">업무 없음</p></div></section>
+        <nav class="panel-tabs"><button class="active" type="button" data-tab="jobs">JOBS <b id="jobsBadge">0</b></button><button type="button" data-tab="approval">APPROVAL <b id="approvalBadge">0</b></button><button type="button" data-tab="events">EVENTS</button></nav>
+        <section id="jobsPanel" class="tab-panel active"><div id="jobsList" class="scroll-list"></div></section><section id="approvalPanel" class="tab-panel"><div id="approvalList" class="scroll-list"></div></section><section id="eventsPanel" class="tab-panel"><div id="eventsList" class="scroll-list"></div></section>
+        <footer class="system-strip"><div><span>RUNTIME</span><b id="runtimeLabel">INITIALIZING</b></div><div><span>LAST SYNC</span><b id="lastSync">—</b></div></footer>
+      </aside>
+    </main>
+  </div>
+  <dialog id="jobDialog" class="job-dialog"><form method="dialog" class="dialog-card"><button class="dialog-close" value="cancel" aria-label="Close">×</button><span id="dialogStatus" class="dialog-status">JOB</span><h2 id="dialogTitle">Job</h2><p id="dialogMeta"></p><pre id="dialogBody"></pre><div id="dialogActions" class="dialog-actions"></div></form></dialog>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script src="./game.js"></script>
+</body>
+</html>
