@@ -22,3 +22,15 @@ body{display:grid!important;place-items:center!important;background:radial-gradi
 .department-layer{z-index:5!important;pointer-events:none!important}.department-hotspot:after{display:none!important}.department-hotspot{z-index:5!important;pointer-events:none!important}
 .section-dialog{width:min(70vw,940px)!important}.dialog-card{background:linear-gradient(180deg,#121a22,#080d12)!important}
 @media(max-width:900px){.app-shell{width:100vw!important;height:75vw!important;min-height:560px!important}.brand-copy h1{font-size:18px!important}.right-rail{grid-template-rows:15% 37% 16% 16% 16%!important}}
+@media(max-width:760px){
+  html,body{overflow:auto!important;display:block!important}
+  body{min-width:960px!important;min-height:720px!important}
+  .app-shell{width:960px!important;height:720px!important;min-width:960px!important;min-height:720px!important;aspect-ratio:4/3!important;grid-template-rows:7.4% 83.4% 9.2%!important;margin:0 auto!important}
+  .top-header{min-height:0!important}
+  .resource-item:nth-child(-n+2){display:flex!important}
+  .main-grid{grid-template-columns:70% 30%!important}
+  .office-map-panel{aspect-ratio:auto!important}
+  .right-rail{min-height:0!important;grid-template-rows:15% 37% 16% 16% 16%!important}
+  .bottom-bar{position:static!important;grid-template-columns:82% 18%!important}
+  .health-box{display:grid!important}
+}
