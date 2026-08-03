@@ -3,54 +3,111 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Unity Global AI Office</title>
-  <meta name="description" content="Unity Global AI Office playable operations game">
-  <link rel="stylesheet" href="../unity-ai-office-v2/styles.css">
-  <link rel="stylesheet" href="../unity-ai-office-v4/layout.css">
-  <link rel="stylesheet" href="./game.css">
-  <link rel="stylesheet" href="./operations.css">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Unity Global AI Office Game V5</title>
+  <meta name="description" content="Unity Global AI Office live NPC operations game">
+
 </head>
 <body>
-  <main id="appShell" class="app-shell" aria-label="Unity Global AI Office">
-    <header class="top-header frame-panel">
-      <div class="brand-block">
-        <div class="brand-emblem" aria-hidden="true"><span>U</span><small>AI</small></div>
-        <div class="brand-copy"><h1>UNITY GLOBAL AI OFFICE</h1><div class="runtime-line"><span id="dayCount">DAY —</span><span class="online-dot"></span><strong id="onlineText">CONNECTING</strong><span class="separator">|</span><span id="clockText">--:--</span><span class="location-icon">☀</span><span>BANGKOK</span></div></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><span>UG</span><small>AI</small></div>
+        <div>
+          <h1>UNITY GLOBAL AI OFFICE</h1>
+          <p><i class="live-dot"></i><span id="connectionText">CONNECTING</span><b>GAME V5</b><span id="bangkokClock">--:--:--</span></p>
+        </div>
       </div>
-      <div class="resource-bar"><div class="resource-item"><span class="resource-icon coin">฿</span><strong id="costValue">0</strong></div><div class="resource-item"><span class="resource-icon diamond">◇</span><strong id="approvalResource">0</strong></div><div class="resource-item"><span class="resource-icon energy">ϟ</span><strong id="energyValue">120/120</strong></div><button id="languageButton" class="icon-button" type="button">KO</button><button id="refreshButton" class="icon-button" type="button">↻</button></div>
+      <div class="top-metrics">
+        <div><span>AGENTS</span><strong id="metricAgents">10</strong></div>
+        <div><span>ACTIVE</span><strong id="metricActive">0</strong></div>
+        <div><span>QUEUE</span><strong id="metricQueue">0</strong></div>
+        <div><span>APPROVAL</span><strong id="metricApproval">0</strong></div>
+        <button id="refreshButton" class="icon-button" type="button" title="Refresh">↻</button>
+      </div>
     </header>
 
-    <section class="main-grid">
-      <section class="office-map-panel" aria-label="AI Office game map">
-        <div class="map-stage" id="mapStage">
-          <canvas id="officeCanvas" aria-label="Playable AI Office canvas"></canvas>
-          <div class="map-tone"></div>
-          <div class="game-hint">NPC를 클릭하면 현재 업무와 이동 상태를 확인할 수 있습니다.</div>
-          <div id="agentCard" class="agent-card" hidden>
-            <button id="agentCardClose" type="button" aria-label="닫기">×</button>
-            <span id="agentCardStatus">IDLE</span>
-            <strong id="agentCardName">AGENT</strong>
-            <small id="agentCardRole">ROLE</small>
-            <p id="agentCardTask">업무 대기</p>
+    <main class="workspace">
+      <section class="game-column">
+        <div class="game-frame">
+          <div class="game-toolbar">
+            <div><i></i><strong>LIVE OFFICE</strong><span>NPC BEHAVIOR ONLINE</span></div>
+            <div class="toolbar-actions">
+              <button id="pauseButton" type="button">Ⅱ PAUSE</button>
+              <button id="speedButton" type="button">1× SPEED</button>
+              <button id="soundButton" type="button">SOUND OFF</button>
+            </div>
           </div>
-          <div id="officeToast" class="office-toast" hidden></div>
+          <div id="game-stage" aria-label="Unity Global AI Office game world">
+            <div id="gameLoading" class="game-loading"><span></span><b>OFFICE WORLD LOADING</b><small>NPC runtime · pathfinding · live operations</small></div>
+          </div>
+          <div class="scene-footer">
+            <div><span class="legend walking"></span>WALKING</div>
+            <div><span class="legend working"></span>WORKING</div>
+            <div><span class="legend approval"></span>APPROVAL</div>
+            <div><span class="legend blocked"></span>BLOCKED</div>
+            <p id="sceneMessage">오피스 시스템을 연결하고 있습니다.</p>
+          </div>
         </div>
+
+        <section class="command-dock">
+          <div class="command-label"><span>▶</span><div><strong>COMMAND CENTER</strong><small>업무를 입력하면 담당 NPC가 실제 자리로 이동합니다.</small></div></div>
+          <form id="commandForm">
+            <select id="templateSelect" aria-label="업무 템플릿"><option value="">직접 지시</option></select>
+            <input id="commandInput" autocomplete="off" maxlength="1200" placeholder="AI Office에 업무를 지시하세요...">
+            <button id="executeButton" type="submit">EXECUTE</button>
+          </form>
+        </section>
       </section>
 
-      <aside class="right-rail">
-        <section class="office-status frame-panel-inner"><h2><span>▥</span> <span>OFFICE STATUS</span></h2><dl><div><dt>AGENTS</dt><dd id="agentsCount">10</dd></div><div><dt>ACTIVE</dt><dd id="activeCount" class="value-active">0</dd></div><div><dt>QUEUE</dt><dd id="queueCount" class="value-queue">0</dd></div><div><dt>APPROVAL</dt><dd id="approvalCount" class="value-approval">0</dd></div></dl></section>
-        <section class="work-panel frame-panel-inner"><nav class="work-tabs"><button class="work-tab active" data-tab="jobs">JOBS</button><button class="work-tab" data-tab="results">RESULTS</button><button class="work-tab" data-tab="approval">APPROVAL</button><button class="work-tab" data-tab="system">SYSTEM</button></nav><div id="tabContent" class="tab-content"></div></section>
-        <section class="list-panel queue-panel frame-panel-inner"><header><h3>QUEUE</h3><strong id="queueTotal">0</strong></header><div id="queueList" class="compact-list"></div></section>
-        <section class="list-panel approval-panel frame-panel-inner"><header><h3>APPROVAL</h3><strong id="approvalTotal">0</strong></header><div id="approvalList" class="compact-list"></div></section>
-        <section class="command-center frame-panel-inner"><h3>COMMAND CENTER</h3><form id="commandForm"><select id="templateSelect" aria-label="Task template"><option value="">직접 지시 / 업무 템플릿 선택</option><option value="태국 시장 경쟁사 조사를 진행하고 핵심 결과를 보고해라">시장 조사</option><option value="현재 프로젝트 상태를 점검하고 위험 요소와 다음 실행안을 보고해라">프로젝트 점검</option><option value="최근 업무 결과를 검증하고 오류가 있으면 수정안을 제시해라">업무 검증</option></select><input id="commandInput" autocomplete="off" placeholder="지시를 입력하세요..."><button id="executeButton" type="submit"><span>실행</span><b>▶</b></button></form><p id="commandFeedback" aria-live="polite"></p></section>
+      <aside class="control-panel">
+        <nav class="panel-tabs" aria-label="Office panels">
+          <button class="active" data-panel="office">OFFICE</button>
+          <button data-panel="jobs">JOBS</button>
+          <button data-panel="approval">APPROVAL</button>
+          <button data-panel="agents">AGENTS</button>
+        </nav>
+        <section id="panelContent" class="panel-content"></section>
+        <footer class="panel-footer">
+          <div><span>SYSTEM HEALTH</span><strong id="healthValue">—</strong></div>
+          <div class="health-track"><i id="healthBar"></i></div>
+          <small id="lastUpdated">Last update: —</small>
+        </footer>
       </aside>
-    </section>
+    </main>
+  </div>
 
-    <footer class="bottom-bar frame-panel"><nav class="bottom-nav"><button class="nav-item active" data-view="dashboard"><span>▥</span><b>DASHBOARD</b></button><button class="nav-item" data-view="projects"><span>☷</span><b>PROJECTS</b></button><button class="nav-item" data-view="agents"><span>♟</span><b>AGENTS</b></button><button class="nav-item" data-view="analytics"><span>▥</span><b>ANALYTICS</b></button><button class="nav-item" data-view="knowledge"><span>▤</span><b>KNOWLEDGE</b></button><button class="nav-item" data-view="resources"><span>▱</span><b>RESOURCES</b></button><button class="nav-item" data-view="reports"><span>▧</span><b>REPORTS</b></button><button class="nav-item" data-view="settings"><span>⚙</span><b>SETTINGS</b></button></nav><div class="health-box"><div><span>SYSTEM HEALTH</span><strong id="healthScore">—</strong></div><div class="health-track"><i id="healthBar"></i></div><span class="health-shield">◇</span></div></footer>
-  </main>
+  <dialog id="detailDialog">
+    <div class="dialog-card">
+      <button id="dialogClose" class="dialog-close" type="button">×</button>
+      <div id="dialogContent"></div>
+    </div>
+  </dialog>
 
-  <dialog id="sectionDialog" class="section-dialog"><form method="dialog" class="dialog-card frame-panel"><button class="dialog-close" value="cancel">×</button><h2 id="dialogTitle"></h2><div id="dialogContent" class="dialog-content"></div></form></dialog>
-  <script src="./game.js"></script>
-  <script src="./operations.js"></script>
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="./payload-a.js"></script>
+  <script src="./payload-b.js"></script>
+  <script src="./payload-c.js"></script>
+  <script>
+  (async()=>{
+    const inflate=async value=>{
+      const bytes=Uint8Array.from(atob(value),c=>c.charCodeAt(0));
+      const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return await new Response(stream).text();
+    };
+    try{
+      const style=document.createElement('style');
+      style.textContent=await inflate(window.__UG_V5_PAYLOAD.css);
+      document.head.appendChild(style);
+      (0,eval)(await inflate(window.__UG_V5_PAYLOAD.js.join('')));
+    }catch(error){
+      console.error(error);
+      const loading=document.getElementById('gameLoading');
+      if(loading)loading.innerHTML='<b>GAME RUNTIME LOAD FAILED</b><small>'+String(error.message||error)+'</small>';
+    }
+  })();
+  </script>
 </body>
 </html>
