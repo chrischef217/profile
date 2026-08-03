@@ -1,0 +1,106 @@
+  if (!capability) throw new Error('CAPABILITY_NOT_AVAILABLE');
+  if (String(capability.agent_id) !== String(job.owner_agent_id || '')) throw new Error('CAPABILITY_AGENT_MISMATCH');
+  const contextKeys = uniqueStrings(Array.isArray(job.context_keys) && job.context_keys.length ? job.context_keys : capability.context_keys);
+  const all = await db('ai_office_context?select=context_key,category,priority,content,version,is_active,updated_at&is_active=eq.true&order=priority.asc');
+  const contexts = (Array.isArray(all) ? all : []).filter(row => contextKeys.includes(String(row.context_key)));
+  const missing = contextKeys.filter(key => !contexts.some(row => String(row.context_key) === key));
+  if (missing.length) throw new Error(`CONTEXT_PACKAGE_INCOMPLETE:${missing.join(',')}`);
+  const governanceRequired = ['source_of_truth','ai_governance','current_session','decision_log','sop_rules','ai_audit_rules'];
+  const governance = (Array.isArray(all) ? all : []).filter(row => governanceRequired.includes(String(row.context_key)));
+  const missingGovernance = governanceRequired.filter(key => !governance.some(row => String(row.context_key) === key));
+  if (missingGovernance.length) throw new Error(`GOVERNANCE_CONTEXT_INCOMPLETE:${missingGovernance.join(',')}`);
+  const combined = [...governance, ...contexts.filter(row => !governanceRequired.includes(String(row.context_key)))];
+  const snapshotItems = combined.map(row => ({key:row.context_key,version:row.version,updated_at:row.updated_at,priority:row.priority}));
+  const snapshotHash = await sha256(JSON.stringify(snapshotItems));
+  return {capability, contextKeys:uniqueStrings(combined.map(row => row.context_key)), contexts:combined, snapshotItems, snapshotHash};
+}
+
+async function budgetState(model) {
+  const budget = await one('ai_office_budget_policy', 'select=*&id=eq.primary');
+  const pricing = await one('ai_office_model_pricing', `select=*&provider=eq.${encodeURIComponent(model.provider)}&model=eq.${encodeURIComponent(model.model_name)}&active=eq.true&order=verified_at.desc`);
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'});
+  const bangkokDay = fmt.format(now);
+  const bangkokMonth = bangkokDay.slice(0,7);
+  const rows = await db('ai_office_usage_ledger?select=total_tokens,estimated_cost_thb,created_at&order=created_at.desc&limit=5000');
+  const usage = Array.isArray(rows) ? rows : [];
+  const summarize = items => items.reduce((acc,row) => ({
+    tokens:acc.tokens + Number(row.total_tokens || 0),
+    cost_thb:acc.cost_thb + Number(row.estimated_cost_thb || 0)
+  }), {tokens:0,cost_thb:0});
+  const daily = usage.filter(row => fmt.format(new Date(row.created_at)) === bangkokDay);
+  const monthly = usage.filter(row => fmt.format(new Date(row.created_at)).slice(0,7) === bangkokMonth);
+  return {budget, pricing, daily:summarize(daily), monthly:summarize(monthly)};
+}
+
+function enforceBudget(state) {
+  const {budget, pricing, daily, monthly} = state;
+  if (!budget) throw new Error('BUDGET_POLICY_NOT_AVAILABLE');
+  if (!(Number(budget.daily_cost_limit_thb) > 0) || !(Number(budget.monthly_cost_limit_thb) > 0)) {
+    throw new Error('BUDGET_LIMITS_NOT_CONFIGURED');
+  }
+  if (budget.require_verified_model_price && !pricing) throw new Error('MODEL_PRICING_NOT_VERIFIED');
+  if (budget.daily_token_limit != null && daily.tokens >= Number(budget.daily_token_limit)) throw new Error('DAILY_TOKEN_LIMIT_REACHED');
+  if (budget.monthly_token_limit != null && monthly.tokens >= Number(budget.monthly_token_limit)) throw new Error('MONTHLY_TOKEN_LIMIT_REACHED');
+  if (daily.cost_thb >= Number(budget.daily_cost_limit_thb)) throw new Error('DAILY_COST_LIMIT_REACHED');
+  if (monthly.cost_thb >= Number(budget.monthly_cost_limit_thb)) throw new Error('MONTHLY_COST_LIMIT_REACHED');
+}
+
+async function recordUsage(job, model, budget, result, purpose) {
+  const inputTokens = Number(result.usage?.input_tokens || 0);
+  const outputTokens = Number(result.usage?.output_tokens || 0);
+  const totalTokens = Number(result.usage?.total_tokens || inputTokens + outputTokens);
+  const cost = budget.pricing
+    ? (inputTokens / 1000000) * Number(budget.pricing.input_cost_per_million_thb || 0)
+      + (outputTokens / 1000000) * Number(budget.pricing.output_cost_per_million_thb || 0)
+    : null;
+  await db('ai_office_usage_ledger', {
+    method:'POST', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({
+      job_id:job.id,
+      provider:model.provider,
+      model:model.model_name,
+      input_tokens:inputTokens,
+      output_tokens:outputTokens,
+      total_tokens:totalTokens,
+      pricing_key:budget.pricing?.pricing_key || null,
+      estimated_cost_thb:cost,
+      response_id:result.responseId,
+      metadata:{purpose,stage:STAGE}
+    })
+  });
+  return {inputTokens, outputTokens, totalTokens, estimatedCostThb:cost};
+}
+
+async function setAgent(agentId, status, jobId, task) {
+  if (!agentId) return;
+  const now = new Date().toISOString();
+  await db(`ai_office_agents?id=eq.${encodeURIComponent(agentId)}`, {
+    method:'PATCH', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({status,current_job_id:jobId,current_task:task,last_heartbeat_at:now,updated_at:now})
+  });
+}
+
+async function releaseJob(job, patch) {
+  await db(`ai_office_jobs?id=eq.${job.id}`, {
+    method:'PATCH', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({...patch,locked_by:null,locked_at:null,lease_expires_at:null,updated_at:new Date().toISOString()})
+  });
+}
+
+async function blockJob(job, reason, extra = {}) {
+  const completed = new Date().toISOString();
+  const result = {reason,stage:STAGE,external_write_performed:false,...extra};
+  await releaseJob(job, {status:'BLOCKED',result,error_message:reason,completed_at:completed});
+  await setAgent(job.owner_agent_id, 'IDLE', null, '다음 업무 대기');
+  await step(job, 'JOB_TERMINAL', 'BLOCKED', result);
+  await event('JOB_BLOCKED', `실행 차단: ${job.title}`, job.owner_agent_id, job.id, result);
+  return {ok:false,status:'BLOCKED',job_id:job.id,reason};
+}
+
+async function failJob(job, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const completed = new Date().toISOString();
+  await releaseJob(job, {status:'FAILED',error_message:message.slice(0,500),completed_at:completed});
+  await setAgent(job.owner_agent_id, 'IDLE', null, '다음 업무 대기');
+  await step(job, 'JOB_TERMINAL', 'FAILED', {error:message.slice(0,300)});

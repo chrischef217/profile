@@ -1,0 +1,93 @@
+  const ai = await callOpenAI(model, instructions, 'Produce the corrected complete PMO report.', {schema,schemaName:'pmo_revised_report',schemaDescription:'Corrected decision-ready PMO report'});
+  const usage = await recordUsage(job, model, budget, ai, 'PMO_REVISION');
+  return {draft:safeJson(ai.output, 'PMO_REVISION_JSON_INVALID'),model,ai,usage};
+}
+
+async function synthesizeParent(job) {
+  await step(job, 'PMO_SYNTHESIS', 'STARTED');
+  const children = await db(`ai_office_jobs?select=id,title,status,owner_agent_id,capability_key,result,error_message,sequence_no&parent_job_id=eq.${job.id}&order=sequence_no.asc`);
+  if (!Array.isArray(children) || !children.length) throw new Error('ORCHESTRATION_CHILDREN_NOT_FOUND');
+  const governanceRows = await db('ai_office_context?select=context_key,priority,version,updated_at,content&context_key=in.(source_of_truth,ai_governance,current_session,decision_log,sop_rules,ai_audit_rules)&is_active=eq.true&order=priority.asc');
+  if (!Array.isArray(governanceRows) || governanceRows.length < 6) throw new Error('GOVERNANCE_CONTEXT_INCOMPLETE');
+  const contextSnapshot = governanceRows.map(row => ({key:row.context_key,version:row.version,updated_at:row.updated_at,priority:row.priority,content:row.content}));
+  const material = children.map(child => ({
+    id:String(child.id),sequence_no:child.sequence_no,title:child.title,status:child.status,agent_id:child.owner_agent_id,
+    capability_key:child.capability_key,output:child.result?.structured || child.result?.output_text || child.result?.reason || child.error_message || 'NO_RESULT',
+    context_snapshot_hash:child.result?.context_snapshot_hash || null
+  }));
+  const policy = await qualityPolicy();
+  if (!policy.enabled) throw new Error('QUALITY_GATE_NOT_ENABLED');
+  const initial = await synthesizeDraft(job, children, material, contextSnapshot);
+  let draft = initial.draft;
+  const reviews = [];
+  let reviewResult = await reviewDraft(job, draft, material, 1, contextSnapshot, policy);
+  reviews.push(reviewResult.review);
+  if (reviewResult.review.verdict === 'BLOCK') {
+    await step(job, 'PMO_QUALITY_GATE', 'BLOCKED', {review:reviewResult.review});
+    return blockJob(job, 'QUALITY_GATE_BLOCKED', {draft,quality_reviews:reviews,child_job_ids:children.map(child => child.id)});
+  }
+  if (reviewResult.review.verdict !== 'PASS') {
+    if (policy.max_revisions < 1) return blockJob(job, 'QUALITY_GATE_REVISION_DISABLED', {draft,quality_reviews:reviews});
+    await step(job, 'PMO_REVISION', 'STARTED', {score:reviewResult.review.score});
+    const revised = await reviseDraft(job, draft, reviewResult.review, material, contextSnapshot);
+    draft = revised.draft;
+    await step(job, 'PMO_REVISION', 'COMPLETED', {usage:revised.usage});
+    reviewResult = await reviewDraft(job, draft, material, 2, contextSnapshot, policy);
+    reviews.push(reviewResult.review);
+  }
+  if (reviewResult.review.verdict !== 'PASS' || Number(reviewResult.review.score) < policy.min_pass_score) {
+    await step(job, 'PMO_QUALITY_GATE', 'BLOCKED', {review:reviewResult.review});
+    return blockJob(job, 'QUALITY_GATE_FAILED_AFTER_REVISION', {draft,quality_reviews:reviews,child_job_ids:children.map(child => child.id)});
+  }
+  const finalModel = initial.model;
+  await step(job, 'PMO_QUALITY_GATE', 'COMPLETED', {score:reviewResult.review.score,rounds:reviews.length});
+  await step(job, 'PMO_SYNTHESIS', 'COMPLETED', {children:children.length});
+  return completeJob(job, {
+    provider:finalModel.provider,model:finalModel.model_name,response_id:initial.ai.responseId,
+    output_text:draft.final_report,structured:draft,
+    child_job_ids:children.map(child => child.id),child_statuses:Object.fromEntries(children.map(child => [child.id,child.status])),
+    quality_gate:{status:'PASSED',score:reviewResult.review.score,rounds:reviews.length,reviews},
+    governance_context_snapshot:contextSnapshot.map(row => ({key:row.key,version:row.version,updated_at:row.updated_at,priority:row.priority})),
+    external_write_performed:false
+  });
+}
+
+async function processJob(job) {
+  try {
+    await setAgent(job.owner_agent_id, 'WORKING', job.id, job.title);
+    await step(job, 'JOB_START', 'STARTED', {job_type:job.job_type,phase:job.phase,worker:job.locked_by});
+    await event('JOB_STARTED', `AI 실행 시작: ${job.title}`, job.owner_agent_id, job.id, {job_type:job.job_type,phase:job.phase,worker:job.locked_by,stage:STAGE});
+    if (job.job_type === 'ORCHESTRATION' && job.phase === 'PLAN') return await planOrchestration(job);
+    if (job.job_type === 'ORCHESTRATION' && job.phase === 'SYNTHESIS') return await synthesizeParent(job);
+    return await executeTask(job);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const blockers = [
+      'NOT_CONFIGURED','NOT_ENABLED','NOT_AVAILABLE','NOT_VERIFIED','LIMIT_REACHED','BUDGET_LIMITS',
+      'CAPABILITY_','CONTEXT_PACKAGE','GOVERNANCE_CONTEXT','PROVIDER_NOT_IMPLEMENTED','MODEL_PROFILE',
+      'OPENAI_API_KEY_PENDING','OPENAI_API_KEY_NOT_CONFIGURED','QUALITY_GATE'
+    ];
+    if (blockers.some(token => message.includes(token))) return blockJob(job, message);
+    return failJob(job, error);
+  }
+}
+
+async function reconcileOrchestrations() {
+  const parents = await db('ai_office_jobs?select=*&job_type=eq.ORCHESTRATION&phase=eq.WAITING_CHILDREN&status=eq.RUNNING&order=created_at.asc&limit=50');
+  let requeued = 0;
+  for (const parent of Array.isArray(parents) ? parents : []) {
+    const children = await db(`ai_office_jobs?select=id,status&parent_job_id=eq.${parent.id}`);
+    if (!Array.isArray(children) || !children.length) continue;
+    if (!children.every(child => TERMINAL.has(String(child.status)))) continue;
+    const payload = {...(parent.payload || {}),phase:'SYNTHESIS',children_terminal_at:new Date().toISOString()};
+    await db(`ai_office_jobs?id=eq.${parent.id}`, {
+      method:'PATCH',headers:{Prefer:'return=minimal'},
+      body:JSON.stringify({status:'QUEUED',phase:'SYNTHESIS',payload,locked_by:null,locked_at:null,lease_expires_at:null,updated_at:new Date().toISOString()})
+    });
+    await event('PMO_SYNTHESIS_QUEUED', `PMO 최종 통합·검수 대기: ${parent.title}`, parent.owner_agent_id, parent.id, {child_statuses:Object.fromEntries(children.map(child => [child.id,child.status])),qa_required:true});
+    requeued++;
+  }
+  return requeued;
+}
+
+async function claimJobs(workerId) {

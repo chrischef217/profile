@@ -1,0 +1,90 @@
+  const usage = await recordUsage(job, model, budget, ai, 'SPECIALIST_EXECUTION');
+  const structured = safeJson(ai.output, 'SPECIALIST_OUTPUT_JSON_INVALID');
+  const invalidSources = structured.confirmed_facts.filter(item => !contextKeys.includes(String(item.source_context_key)));
+  if (invalidSources.length) throw new Error('SPECIALIST_SOURCE_REFERENCE_INVALID');
+  await step(job, 'SPECIALIST_EXECUTION', 'COMPLETED', {context_snapshot_hash:snapshotHash,usage,requires_human_confirmation:structured.requires_human_confirmation});
+  return completeJob(job, {
+    provider:model.provider,model:model.model_name,response_id:ai.responseId,
+    output_text:structured.deliverable,structured,usage:ai.usage,estimated_cost_thb:usage.estimatedCostThb,
+    capability_key:capability.capability_key,capability_version:capability.version,
+    context_keys:contextKeys,context_snapshot:snapshotItems,context_snapshot_hash:snapshotHash,
+    external_write_performed:false,quality_gate:{status:'SPECIALIST_STRUCTURED',source_validation:'PASSED'}
+  });
+}
+
+async function createReview(job, round, model, review, ai, usage, contextSnapshot) {
+  await db('ai_office_quality_reviews', {
+    method:'POST',headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({
+      job_id:job.id,root_job_id:job.root_job_id || job.id,review_round:round,reviewer_agent_id:'audit',
+      provider:model.provider,model:model.model_name,response_id:ai.responseId,verdict:review.verdict,score:review.score,
+      criteria:review.criteria,defects:review.defects,unsupported_claims:review.unsupported_claims,conflicts:review.conflicts,
+      revision_instructions:review.revision_instructions,usage,context_snapshot:contextSnapshot,stage:STAGE
+    })
+  });
+}
+
+async function reviewDraft(job, draft, children, round, contextSnapshot, policy) {
+  const reviewJob = {...job,owner_agent_id:'audit'};
+  const model = await modelFor(reviewJob, 'reviewer');
+  const {budget} = await validateRuntime(model);
+  const instructions = [
+    'You are the independent Audit and final quality gate for Unity Global AI Office.',
+    'Review the PMO draft against the Managing Director request, specialist evidence and authoritative governance context.',
+    `A PASS requires score >= ${policy.min_pass_score}, no unsupported factual claim, no hidden failed work, no material conflict, explicit risk disclosure and direct instruction compliance.`,
+    'Use REVISE when defects are fixable. Use BLOCK for fabricated facts, unresolved critical conflict, unsafe recommendation or missing essential evidence.',
+    'Do not rewrite the answer. Return only the structured review.',
+    `Original request: ${job.title}`,
+    `PMO draft: ${JSON.stringify(draft)}`,
+    `Specialist evidence: ${JSON.stringify(children)}`,
+    `Governance context snapshot: ${JSON.stringify(contextSnapshot)}`
+  ].join('\n');
+  const ai = await callOpenAI(model, instructions, 'Perform the independent final review.', {schema:REVIEW_SCHEMA,schemaName:'pmo_quality_review',schemaDescription:'Independent PMO quality gate'});
+  const usage = await recordUsage(job, model, budget, ai, `PMO_REVIEW_ROUND_${round}`);
+  const review = safeJson(ai.output, 'PMO_REVIEW_JSON_INVALID');
+  if (review.verdict === 'PASS' && Number(review.score) < policy.min_pass_score) review.verdict = 'REVISE';
+  if (policy.block_on_unsupported_claim && review.unsupported_claims.length > 0 && review.verdict === 'PASS') review.verdict = 'REVISE';
+  if (policy.block_on_critical_conflict && review.defects.some(item => item.severity === 'CRITICAL')) review.verdict = 'BLOCK';
+  await createReview(job, round, model, review, ai, usage, contextSnapshot);
+  await event('PMO_QUALITY_REVIEW', `PMO 품질검수 ${round}: ${review.verdict} ${review.score}`, 'audit', job.id, {round,verdict:review.verdict,score:review.score,defects:review.defects.length});
+  return {review,model,ai,usage};
+}
+
+async function synthesizeDraft(job, children, material, contextSnapshot) {
+  const model = await modelFor(job, 'planner');
+  const {budget} = await validateRuntime(model);
+  const childIds = children.map(child => String(child.id));
+  const schema = synthesisSchema(childIds);
+  const instructions = [
+    'You are the PMO of Unity Global AI Office.',
+    'Synthesize specialist outputs into one decision-ready report for the Managing Director.',
+    'Do not hide failed, blocked or incomplete child tasks. Clearly separate confirmed facts, assumptions, conflicts, risks and next actions.',
+    'Every confirmed fact must cite one or more specialist evidence_job_ids from the supplied list.',
+    'Remove duplication and resolve conflicts using the source-of-truth priority. If conflict remains, disclose it.',
+    'Do not claim external actions were executed.',
+    'Use Korean unless the original request requires another language.',
+    `Original request: ${job.title}`,
+    `Synthesis instructions: ${job.payload?.synthesis_instructions || 'Create a complete integrated report.'}`,
+    `Specialist results: ${JSON.stringify(material)}`,
+    `Governance context snapshot: ${JSON.stringify(contextSnapshot)}`
+  ].join('\n');
+  const ai = await callOpenAI(model, instructions, 'Create the governed PMO draft report.', {schema,schemaName:'pmo_governed_report',schemaDescription:'Decision-ready PMO report grounded in specialist evidence'});
+  const usage = await recordUsage(job, model, budget, ai, 'PMO_SYNTHESIS_DRAFT');
+  const draft = safeJson(ai.output, 'PMO_SYNTHESIS_JSON_INVALID');
+  return {draft,model,ai,usage};
+}
+
+async function reviseDraft(job, draft, review, children, contextSnapshot) {
+  const model = await modelFor(job, 'planner');
+  const {budget} = await validateRuntime(model);
+  const schema = synthesisSchema(children.map(child => String(child.id)));
+  const instructions = [
+    'You are the PMO revising a report after an independent Audit review.',
+    'Fix every listed defect without inventing facts. Remove unsupported claims. Preserve transparent failed or incomplete work.',
+    'Return the complete revised structured report only.',
+    `Original request: ${job.title}`,
+    `Previous draft: ${JSON.stringify(draft)}`,
+    `Audit review: ${JSON.stringify(review)}`,
+    `Specialist evidence: ${JSON.stringify(children)}`,
+    `Governance context snapshot: ${JSON.stringify(contextSnapshot)}`
+  ].join('\n');

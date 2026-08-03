@@ -1,0 +1,168 @@
+const BASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY') || '';
+const REST = `${BASE_URL}/rest/v1`;
+const RUNNER_URL = `${BASE_URL}/functions/v1/unity-ai-office-runner-v2`;
+const STAGE = 'ONLINE_MULTI_AGENT_STAGE_9_PMO_QA';
+const MAX_PARALLEL = 3;
+const MAX_REVISIONS = 1;
+const MIN_PASS_SCORE = 85;
+const TERMINAL = new Set(['COMPLETED', 'BLOCKED', 'FAILED', 'CANCELLED']);
+const RISK_RANK = {L0: 0, L1: 1, L2: 2, L3: 3};
+
+function response(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
+  });
+}
+
+async function db(path, init = {}) {
+  const headers = new Headers(init.headers || {});
+  headers.set('apikey', SERVICE_KEY);
+  headers.set('authorization', `Bearer ${SERVICE_KEY}`);
+  headers.set('content-type', 'application/json');
+  const result = await fetch(`${REST}/${path}`, {...init, headers});
+  const text = await result.text();
+  let body = [];
+  if (text) {
+    try { body = JSON.parse(text); }
+    catch { body = text; }
+  }
+  if (!result.ok) {
+    console.error('DB_ERROR', result.status, path, typeof body === 'string' ? body.slice(0, 500) : body);
+    throw new Error(`DB_${result.status}:${path}:${JSON.stringify(body).slice(0,400)}`);
+  }
+  return body;
+}
+
+async function one(table, filter) {
+  const rows = await db(`${table}?${filter}&limit=1`);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function event(type, message, agent = null, job = null, metadata = {}) {
+  await db('ai_office_events', {
+    method:'POST', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({event_type:type,message,agent_id:agent,job_id:job,metadata})
+  });
+}
+
+async function step(job, stepKey, status, details = {}) {
+  await db('ai_office_execution_steps', {
+    method:'POST', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({
+      job_id:job?.id || null,
+      root_job_id:job?.root_job_id || job?.id || null,
+      agent_id:job?.owner_agent_id || null,
+      step_key:stepKey,
+      status,
+      details:{...details,stage:STAGE},
+      completed_at:['COMPLETED','FAILED','BLOCKED'].includes(status) ? new Date().toISOString() : null
+    })
+  });
+}
+
+async function markRuntime(result) {
+  const now = new Date().toISOString();
+  await db('ai_office_runtime?id=eq.primary', {
+    method:'PATCH', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({
+      last_tick_at:now,
+      last_tick_result:{...result,stage:STAGE,runner:'PMO_QA_EDGE_RUNNER',at:now},
+      updated_at:now
+    })
+  });
+}
+
+async function authorize(req) {
+  const runtime = await one('ai_office_runtime', 'select=internal_tick_token&id=eq.primary');
+  const expected = String(runtime?.internal_tick_token || '');
+  const supplied = req.headers.get('x-ai-office-runner-token') || '';
+  return expected.length === 64 && supplied === expected;
+}
+
+function uniqueStrings(values) {
+  return [...new Set((Array.isArray(values) ? values : []).map(value => String(value || '').trim()).filter(Boolean))];
+}
+
+function safeJson(text, errorCode) {
+  try { return JSON.parse(text); }
+  catch { throw new Error(errorCode); }
+}
+
+async function sha256(value) {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(hash)].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function extractText(body) {
+  if (typeof body?.output_text === 'string' && body.output_text.trim()) return body.output_text.trim();
+  const parts = [];
+  for (const item of Array.isArray(body?.output) ? body.output : []) {
+    for (const content of Array.isArray(item?.content) ? item.content : []) {
+      if (typeof content?.text === 'string') parts.push(content.text);
+      if (typeof content?.output_text === 'string') parts.push(content.output_text);
+    }
+  }
+  return parts.join('\n').trim();
+}
+
+async function callOpenAI(model, instructions, input, options = {}) {
+  if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY_NOT_CONFIGURED');
+  const payload = {
+    model:model.model_name,
+    instructions,
+    input,
+    max_output_tokens:Number(options.maxOutputTokens || model.max_output_tokens || 3200),
+    store:false
+  };
+  if (model.reasoning_effort && model.reasoning_effort !== 'none') {
+    payload.reasoning = {effort:model.reasoning_effort};
+  }
+  if (options.schema) {
+    payload.text = {
+      verbosity:'low',
+      format:{
+        type:'json_schema',
+        name:options.schemaName || 'structured_result',
+        description:options.schemaDescription || 'Strict structured result',
+        strict:true,
+        schema:options.schema
+      }
+    };
+  }
+  const api = await fetch('https://api.openai.com/v1/responses', {
+    method:'POST',
+    headers:{authorization:`Bearer ${OPENAI_KEY}`,'content-type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  const body = await api.json().catch(() => ({}));
+  if (!api.ok) {
+    throw new Error(`OPENAI_${api.status}:${String(body?.error?.message || 'request failed').slice(0, 400)}`);
+  }
+  const output = extractText(body);
+  if (!output) throw new Error('OPENAI_EMPTY_OUTPUT');
+  return {output, usage:body.usage || {}, responseId:body.id || null};
+}
+
+async function modelFor(job, purpose = 'primary') {
+  const agentId = String(job.owner_agent_id || 'pmo');
+  const policy = await one('ai_office_agent_model_policy', `select=*&agent_id=eq.${encodeURIComponent(agentId)}&enabled=eq.true`);
+  if (!policy) throw new Error('AGENT_MODEL_POLICY_NOT_FOUND');
+  let key = String(job.model_profile || '').trim();
+  if (!key) {
+    if (purpose === 'planner') key = policy.planner_model_key || policy.primary_model_key;
+    else if (purpose === 'reviewer') key = policy.reviewer_model_key || policy.primary_model_key;
+    else key = policy.primary_model_key;
+  }
+  const model = await one('ai_office_model_registry', `select=*&model_key=eq.${encodeURIComponent(key)}&enabled=eq.true`);
+  if (!model) throw new Error('MODEL_PROFILE_NOT_AVAILABLE');
+  return model;
+}
+
+async function capabilityBundle(job) {
+  const capabilityKey = String(job.capability_key || '').trim();
+  if (!capabilityKey) throw new Error('CAPABILITY_NOT_ASSIGNED');
+  const capability = await one('ai_office_capabilities', `select=*&capability_key=eq.${encodeURIComponent(capabilityKey)}&enabled=eq.true`);

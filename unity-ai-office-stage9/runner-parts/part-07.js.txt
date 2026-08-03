@@ -1,0 +1,53 @@
+  const rows = await db('rpc/ai_office_claim_jobs', {method:'POST',body:JSON.stringify({p_worker_id:workerId,p_limit:MAX_PARALLEL,p_lease_seconds:540})});
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function queueCount() {
+  const rows = await db('ai_office_jobs?select=id&status=in.(QUEUED,APPROVED)&limit=20');
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
+function scheduleFollowUp(token) {
+  const task = fetch(RUNNER_URL, {
+    method:'POST',headers:{'content-type':'application/json','x-ai-office-runner-token':token},body:'{}'
+  }).catch(error => console.error('FOLLOW_UP_FAILED', error));
+  if (globalThis.EdgeRuntime?.waitUntil) globalThis.EdgeRuntime.waitUntil(task);
+}
+
+async function run(token) {
+  const runtime = await one('ai_office_runtime', 'select=workday_enabled,environment_mode&id=eq.primary');
+  if (!runtime?.workday_enabled) {
+    const report = {ok:true,status:'SCHEDULER_PAUSED'};
+    await markRuntime(report);
+    return report;
+  }
+  const reconciledBefore = await reconcileOrchestrations();
+  const workerId = `runner-v2-${crypto.randomUUID()}`;
+  const jobs = await claimJobs(workerId);
+  if (!jobs.length) {
+    const report = {ok:true,status:'NO_QUEUED_JOB',reconciled:reconciledBefore};
+    await markRuntime(report);
+    return report;
+  }
+  const results = await Promise.all(jobs.map(processJob));
+  const reconciledAfter = await reconcileOrchestrations();
+  const remaining = await queueCount();
+  const report = {ok:true,status:'BATCH_PROCESSED',worker_id:workerId,claimed:jobs.length,results,reconciled:reconciledBefore+reconciledAfter,remaining};
+  await markRuntime(report);
+  if (remaining > 0) scheduleFollowUp(token);
+  return report;
+}
+
+globalThis.__UG_STAGE9_HANDLER__ = async req => {
+  try {
+    if (req.method !== 'POST') return response({ok:false,error:'METHOD_NOT_ALLOWED'},405);
+    if (!(await authorize(req))) return response({ok:false,error:'UNAUTHORIZED_RUNNER'},401);
+    const token = req.headers.get('x-ai-office-runner-token') || '';
+    return response(await run(token));
+  } catch (error) {
+    console.error(error);
+    const report = {ok:false,error:error instanceof Error ? error.message : String(error)};
+    try { await markRuntime({...report,status:'RUNNER_INTERNAL_ERROR'}); } catch {}
+    return response(report,500);
+  }
+};

@@ -1,0 +1,84 @@
+      },required:['sequence_no','title','agent_id','capability_key','risk_level','depends_on_sequences','acceptance_criteria','expected_output']}},
+      synthesis_instructions:{type:'string'}
+    },
+    required:['summary','tasks','synthesis_instructions']
+  };
+  const instructions = [
+    'You are the PMO planner for Unity Global AI Office.',
+    'Break the Managing Director request into the smallest useful specialist tasks.',
+    'Use only the supplied agent/capability pairs. Never assign a capability to the wrong agent.',
+    'Create 1 to 5 tasks. Avoid duplicated tasks. Dependencies may only reference earlier sequence numbers.',
+    'Every task must have measurable acceptance criteria and a concrete expected output.',
+    'Classify risky external-effect or regulated work as L2 or L3. The system will require human approval.',
+    'Do not execute the work. Return only the structured plan.',
+    `Available specialist capabilities: ${JSON.stringify(available)}`
+  ].join('\n');
+  const ai = await callOpenAI(model, instructions, String(job.title), {schema,schemaName:'pmo_execution_plan_v2',schemaDescription:'A governed specialist multi-agent execution plan'});
+  const usage = await recordUsage(job, model, budget, ai, 'PMO_PLAN');
+  const plan = safeJson(ai.output, 'PMO_PLAN_JSON_INVALID');
+  const capByKey = new Map(available.map(item => [item.capability_key,item]));
+  const sorted = [...plan.tasks].sort((a,b) => a.sequence_no - b.sequence_no);
+  const seenSequences = new Set();
+  const idsBySequence = new Map();
+  const children = [];
+  for (const task of sorted) {
+    if (seenSequences.has(task.sequence_no)) throw new Error('PMO_PLAN_DUPLICATE_SEQUENCE');
+    seenSequences.add(task.sequence_no);
+    const cap = capByKey.get(task.capability_key);
+    if (!cap || String(cap.agent_id) !== String(task.agent_id)) throw new Error('PMO_PLAN_CAPABILITY_MISMATCH');
+    if ((RISK_RANK[task.risk_level] ?? 99) > (RISK_RANK[cap.risk_ceiling] ?? 0)) throw new Error('PMO_PLAN_RISK_EXCEEDS_CAPABILITY');
+    const invalidDependency = task.depends_on_sequences.some(seq => Number(seq) >= Number(task.sequence_no));
+    if (invalidDependency) throw new Error('PMO_PLAN_FORWARD_DEPENDENCY');
+    const dependencies = uniqueStrings(task.depends_on_sequences).map(seq => idsBySequence.get(Number(seq))).filter(Boolean);
+    const status = ['L2','L3'].includes(task.risk_level) ? 'WAITING_APPROVAL' : 'QUEUED';
+    const rows = await db('ai_office_jobs', {
+      method:'POST',headers:{Prefer:'return=representation'},
+      body:JSON.stringify({
+        title:task.title,status,owner_agent_id:task.agent_id,capability_key:task.capability_key,
+        context_keys:uniqueStrings(cap.context_keys),risk_level:task.risk_level,requested_by:job.requested_by,
+        parent_job_id:job.id,root_job_id:job.root_job_id || job.id,job_type:'TASK',phase:'EXECUTE',
+        sequence_no:task.sequence_no,execution_priority:100 + task.sequence_no,depends_on:dependencies,
+        payload:{source:'pmo_orchestration_v2',parent_title:job.title,plan_summary:plan.summary,acceptance_criteria:task.acceptance_criteria,expected_output:task.expected_output}
+      })
+    });
+    const child = Array.isArray(rows) ? rows[0] : null;
+    if (!child) throw new Error('CHILD_JOB_INSERT_FAILED');
+    idsBySequence.set(Number(task.sequence_no), child.id);
+    children.push(child);
+    await event(status === 'WAITING_APPROVAL' ? 'APPROVAL_REQUESTED' : 'CHILD_JOB_QUEUED', `PMO 자식 업무: ${task.title}`, task.agent_id, child.id, {parent_job_id:job.id,root_job_id:job.root_job_id || job.id,sequence_no:task.sequence_no,acceptance_criteria:task.acceptance_criteria});
+  }
+  const payload = {...(job.payload || {}),phase:'WAITING_CHILDREN',synthesis_instructions:plan.synthesis_instructions,child_count:children.length,qa_required:true,max_revisions:MAX_REVISIONS};
+  await db(`ai_office_jobs?id=eq.${job.id}`, {
+    method:'PATCH',headers:{Prefer:'return=minimal'},
+    body:JSON.stringify({status:'RUNNING',phase:'WAITING_CHILDREN',plan,payload,locked_by:null,locked_at:null,lease_expires_at:null,updated_at:new Date().toISOString()})
+  });
+  await setAgent(job.owner_agent_id, 'IDLE', null, '전문 Agent 결과 대기');
+  await step(job, 'PMO_PLAN', 'COMPLETED', {children:children.length,usage});
+  await event('PMO_PLAN_CREATED', `PMO 실행계획 생성: ${children.length}개 업무`, job.owner_agent_id, job.id, {child_job_ids:children.map(child => child.id),provider:model.provider,model:model.model_name,usage});
+  return {ok:true,status:'WAITING_CHILDREN',job_id:job.id,children:children.length,model:model.model_name};
+}
+
+async function executeTask(job) {
+  await step(job, 'SPECIALIST_EXECUTION', 'STARTED');
+  const model = await modelFor(job, job.job_type === 'REVIEW' ? 'reviewer' : 'primary');
+  const {budget} = await validateRuntime(model);
+  const {capability,contextKeys,contexts,snapshotItems,snapshotHash} = await capabilityBundle(job);
+  const schema = specialistSchema(contextKeys);
+  const instructions = [
+    'You are an internal Unity Global AI Office specialist agent.',
+    `Assigned agent: ${job.owner_agent_id}.`,
+    `Capability: ${capability.name} (${capability.capability_key}, version ${capability.version}).`,
+    `Capability description: ${capability.description}`,
+    `Prompt rules: ${JSON.stringify(capability.prompt_rules || {})}`,
+    'Respond in Korean unless the task explicitly requires another language.',
+    'Use the supplied company context as authoritative. Do not invent missing facts.',
+    'Every confirmed fact must name one supplied source_context_key. Put uncertain items in assumptions or missing_information.',
+    'Explicitly identify conflicts, risks and human confirmation requirements.',
+    'Do not claim an email, payment, deployment, publication, deletion, legal filing, FDA submission or other external action was executed.',
+    'Produce a finished practical work product, not a generic explanation.',
+    `Acceptance criteria: ${JSON.stringify(job.payload?.acceptance_criteria || [])}`,
+    `Expected output: ${String(job.payload?.expected_output || '')}`,
+    `Company context: ${JSON.stringify(contexts)}`,
+    job.payload?.parent_title ? `Parent PMO request: ${job.payload.parent_title}` : ''
+  ].filter(Boolean).join('\n');
+  const ai = await callOpenAI(model, instructions, String(job.title), {schema,schemaName:'specialist_work_product',schemaDescription:'Grounded specialist work product with evidence and risks'});
