@@ -1,0 +1,12 @@
+const BASE_URL=Deno.env.get('SUPABASE_URL')||'';
+const SERVICE_KEY=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
+const REST=`${BASE_URL}/rest/v1`;
+const RUNNER_V2=`${BASE_URL}/functions/v1/unity-ai-office-runner-v2`;
+const LIVE_QA=`${BASE_URL}/functions/v1/unity-ai-office-stage11-live-qa`;
+
+function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}})}
+async function db(path:string){const response=await fetch(`${REST}/${path}`,{headers:{apikey:SERVICE_KEY,authorization:`Bearer ${SERVICE_KEY}`}});const body=await response.json().catch(()=>[]);if(!response.ok)throw new Error(`DB_${response.status}`);return body}
+async function token(){const rows=await db('ai_office_runtime?select=internal_tick_token&id=eq.primary&limit=1');return String(rows?.[0]?.internal_tick_token||'')}
+function background(task:Promise<unknown>){if(globalThis.EdgeRuntime?.waitUntil)globalThis.EdgeRuntime.waitUntil(task);else task.catch(console.error)}
+async function qaDue(){const rows=await db('ai_office_system_test_runs?select=completed_at,status&test_suite=eq.STAGE11_LIVE_DEPLOYMENT&order=started_at.desc&limit=1');const last=rows?.[0];if(!last?.completed_at)return true;return Date.now()-new Date(last.completed_at).getTime()>20*60*1000}
+Deno.serve(async req=>{try{if(req.method!=='POST')return json({ok:false,error:'METHOD_NOT_ALLOWED'},405);const supplied=req.headers.get('x-ai-office-runner-token')||'',expected=await token();if(expected.length!==64||supplied!==expected)return json({ok:false,error:'UNAUTHORIZED_RUNNER'},401);const body=await req.text();const upstream=await fetch(RUNNER_V2,{method:'POST',headers:{'content-type':'application/json','x-ai-office-runner-token':supplied},body:body||'{}'});const text=await upstream.text();if(await qaDue())background(fetch(LIVE_QA,{method:'POST',headers:{'content-type':'application/json','x-ai-office-runner-token':supplied},body:JSON.stringify({source:'runner_bridge'})}).catch(error=>console.error('LIVE_QA_TRIGGER_FAILED',error)));return new Response(text,{status:upstream.status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}})}catch(error){console.error(error);return json({ok:false,error:error instanceof Error?error.message:String(error)},500)}});
