@@ -48,7 +48,7 @@ Implemented as one integrated runtime:
 
 - Direct public Stage 11 API: `unity-ai-office-prod` version 10
 - Runner bridge with scheduled QA: `unity-ai-office-runner` version 9
-- Internal PMO/Audit runtime runner: `unity-ai-office-runner-v2`
+- Internal PMO/Audit runtime runner: `unity-ai-office-runner-v2` version 9
 - Internal live QA: `unity-ai-office-stage11-live-qa` version 3
 - OpenAI Vault gateway: `unity-ai-office-openai-gateway`
 - `unity-ai-office-prod-v5` remains deployed only as a rollback artifact and is not in the active request path.
@@ -99,6 +99,14 @@ External GitHub Actions live QA:
 - Public API preflight: HTTP 200
 - Document integrity: PASS
 - Frozen Game V5 HTML and payload: HTTP 200
+
+Final scheduler verification:
+
+- Runtime environment: `ONLINE_MULTI_AGENT_STAGE_11_HARDENED`
+- Runner result stage: `ONLINE_MULTI_AGENT_STAGE_11_HARDENED`
+- Runner status: `NO_QUEUED_JOB`
+- Open jobs: 0
+- Temporary self-test jobs: 0
 
 ## Canonical frontend
 
