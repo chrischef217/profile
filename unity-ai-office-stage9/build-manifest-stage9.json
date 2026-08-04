@@ -1,0 +1,57 @@
+{
+  "project": "Unity Global AI Office",
+  "stage": "ONLINE_MULTI_AGENT_STAGE_9_PMO_QA",
+  "effective_date": "2026-08-04",
+  "supabase_project": "ckzwmimmwdnmpohgvcka",
+  "design": {
+    "status": "FROZEN",
+    "v5_commit": "526389e2ea3bb24004bcd49802f510fef24c433d"
+  },
+  "control_console": {
+    "path": "unity-ai-office-control/index.html",
+    "commit": "a7e55f2cb90487d9e4446940841641382a76e50f",
+    "stable_url": "https://raw.githack.com/chrischef217/profile/main/unity-ai-office-control/index.html",
+    "pinned_url": "https://raw.githack.com/chrischef217/profile/a7e55f2cb90487d9e4446940841641382a76e50f/unity-ai-office-control/index.html",
+    "http_status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "javascript_syntax": "PASS"
+  },
+  "edge_functions": {
+    "stable_api": {"slug": "unity-ai-office-prod", "version": 6},
+    "stage9_api": {"slug": "unity-ai-office-prod-v2", "version": 1},
+    "runner_bridge": {"slug": "unity-ai-office-runner", "version": 8},
+    "stage9_runner": {"slug": "unity-ai-office-runner-v2", "version": 8},
+    "openai_vault_gateway": {"slug": "unity-ai-office-openai-gateway", "version": 1}
+  },
+  "runtime_module": {
+    "module_key": "stage9_runner",
+    "version": "2026-08-04.1",
+    "bytes": 40810,
+    "sha256": "788e9c4195a102d96779605d4231d409ec1cfb4785dfa15f37e5f0269b776a59",
+    "runtime_external_fetch": false
+  },
+  "quality_policy": {
+    "enabled": true,
+    "minimum_pass_score": 85,
+    "maximum_revisions": 1,
+    "block_unsupported_claims": true,
+    "block_critical_conflicts": true
+  },
+  "security": {
+    "credential_storage": "SUPABASE_VAULT",
+    "openai_store": false,
+    "administrator_session_hash": "SHA-256",
+    "login_rate_limit": "5 failures / 15 minutes",
+    "runner_internal_token": true,
+    "claim_rpc_role": "service_role only",
+    "external_tool_execution": false
+  },
+  "activation": {
+    "openai_credential_configured": false,
+    "daily_thb_budget_configured": false,
+    "monthly_thb_budget_configured": false,
+    "model_execution_enabled": false,
+    "paid_e2e_approved": false,
+    "status": "SAFE_BLOCKED_PENDING_MANAGING_DIRECTOR_INPUT"
+  }
+}
