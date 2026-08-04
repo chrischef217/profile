@@ -6,7 +6,6 @@
   <meta name="robots" content="noindex,nofollow">
   <title>Unity Global AI Office Game V5</title>
   <meta name="description" content="Unity Global AI Office live NPC operations game">
-
 </head>
 <body>
   <div class="app-shell">
@@ -86,6 +85,23 @@
 
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
 
+  <script>
+  // Design is frozen. Only redirect existing runtime API requests to the current Stage 10 backend.
+  (()=>{
+    const nativeFetch=window.fetch.bind(window);
+    const production='https://ckzwmimmwdnmpohgvcka.supabase.co/functions/v1/unity-ai-office-prod';
+    const legacy=/https:\/\/ckzwmimmwdnmpohgvcka\.supabase\.co\/functions\/v1\/unity-ai-office-(?:dev-open-v2|dev-open|web|prod-v2|prod-v3|prod-v4)/g;
+    window.fetch=(input,init)=>{
+      if(input instanceof Request){
+        const replaced=input.url.replace(legacy,production);
+        return nativeFetch(replaced===input.url?input:new Request(replaced,input),init);
+      }
+      return nativeFetch(String(input).replace(legacy,production),init);
+    };
+    window.__UG_AI_OFFICE_STAGE='ONLINE_MULTI_AGENT_STAGE_10_DOCUMENT_GROUNDED';
+    window.__UG_AI_OFFICE_API=production;
+  })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
   <script src="./payload-a.js"></script>
   <script src="./payload-b.js"></script>
