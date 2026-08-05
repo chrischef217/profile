@@ -25,7 +25,8 @@ Implemented as one integrated runtime:
 - Approval gate and approval resume
 - API mutation rate limiting
 - Command idempotency
-- Credential replacement lock after initial Vault configuration
+- Public credential replacement lock after initial Vault configuration
+- Controlled credential rotation directly in Supabase Vault
 - Usage, token and THB cost ledger
 - Execution steps and system test records
 - Public Data API privilege removal for all AI Office tables
@@ -114,13 +115,18 @@ Final scheduler verification:
 - Live URL: `https://raw.githack.com/chrischef217/profile/main/unity-ai-office-v5/index.html`
 - Game V5 visual files were not modified by Stage 11.
 
-## Remaining external activation gates
+## Test budget and API funding decision — 2026-08-05
 
-Paid model execution is intentionally blocked until both real values exist:
+- Test-stage OpenAI API charges are paid from the Managing Director's personal OpenAI API project.
+- Internal AI Office hard-stop budget: daily `20 THB`, monthly `100 THB`.
+- Production-stage API charges will move to a Unity Global company-owned OpenAI project and key.
+- The company key can replace the personal key without changing application code or AI Office database structure.
+- The public API cannot replace an already configured credential. Rotation must update the same named secret directly in Supabase Vault and create an audit event.
+- OpenAI key plaintext must never be committed to GitHub, written into MD files, exposed in browser code or pasted into chat.
+- AI Office uses Responses with `store=false` and keeps operational context in Supabase, so changing the project-scoped key does not migrate or discard AI Office operational records.
 
-1. OpenAI API key stored in Supabase Vault.
-2. Managing Director-approved daily and monthly THB cost limits.
+## Remaining external activation gate
 
-After both inputs exist, run one real paid PMO → specialist Agents → PMO synthesis → Audit review E2E job and obtain GPT(PMO) final approval.
+The internal THB budget gate is complete. Paid model execution remains intentionally blocked until a real OpenAI API key is stored in Supabase Vault.
 
-No key or budget value may be invented, inferred, committed to GitHub or stored in browser code.
+After the personal test key is registered, run one real paid PMO → specialist Agents → PMO synthesis → Audit review E2E job and obtain GPT(PMO) final approval.
