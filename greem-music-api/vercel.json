@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/elevenlabs/generate", "destination": "/api/elevenlabs" },
+    { "source": "/api/stability/generate", "destination": "/api/stability-generate" },
+    { "source": "/api/stability/result", "destination": "/api/stability-result" }
+  ]
+}
